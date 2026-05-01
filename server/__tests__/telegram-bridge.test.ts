@@ -729,7 +729,7 @@ describe('subscribeForResponse', () => {
     internals(bridge).subscribeForResponse(session.id, 12345);
     holder.cb!(session.id, makeSessionErrorEvent('crash'));
     await new Promise((r) => setTimeout(r, 100));
-    expect(sentTexts.some((m) => m.includes('Session crashed'))).toBe(true);
+    expect(sentTexts.some((m) => m.includes('crashed unexpectedly'))).toBe(true);
     expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
   });
 
