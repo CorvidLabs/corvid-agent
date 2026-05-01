@@ -1304,8 +1304,20 @@ export class ProcessManager {
     updateSessionTurns(this.db, session.id, totalTurns);
     const existingMeta = this.sessionMeta.get(session.id);
     if (existingMeta) existingMeta.turnCount = totalTurns;
-    session.lastContextTokens = estimateTokens(resumePrompt);
-    session.lastContextWindow = getContextBudget(agentModel);
+    const tokens = estimateTokens(resumePrompt);
+    const contextWindow = getContextBudget(agentModel);
+    session.lastContextTokens = tokens;
+    session.lastContextWindow = contextWindow;
+    updateSessionContextTokens(this.db, session.id, tokens, contextWindow);
+    const usagePercent = contextWindow > 0 ? Math.round((tokens / contextWindow) * 100) : 0;
+    if (existingMeta) existingMeta.lastContextUsagePercent = usagePercent;
+    this.eventBus.emit(session.id, {
+      type: 'context_usage',
+      session_id: session.id,
+      estimatedTokens: tokens,
+      contextWindow,
+      usagePercent,
+    } as ClaudeStreamEvent);
   }
 
   private buildResumePrompt(session: Session, newPrompt?: string): { prompt: string; activeTurns: number } {
