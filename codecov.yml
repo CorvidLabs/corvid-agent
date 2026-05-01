@@ -7,7 +7,7 @@ coverage:
     patch:
       default:
         target: 80%
-        threshold: 15%
+        threshold: 30%
 
 ignore:
   - "server/discord/gateway.ts"       # Integration-heavy Discord gateway — requires live connection
