@@ -243,12 +243,13 @@ export class TelegramBridge {
       }
       const compacted = this.processManager.compactSession(sessionId);
       if (compacted) {
+        this.userSessions.delete(userId);
         await this.sendText(
           message.chat.id,
           'Context compacted. The session will restart with condensed context on your next message.',
         );
       } else {
-        await this.sendText(message.chat.id, 'Could not compact session — it may have already ended.');
+        await this.sendText(message.chat.id, 'No active session process — it may have already ended.');
       }
       return;
     }
@@ -484,7 +485,7 @@ export class TelegramBridge {
       case 'timeout':
         return 'Session timed out. Send a message to restart — try breaking your request into smaller steps.';
       case 'crash':
-        return 'The agent session crashed unexpectedly. Send a new message to restart.';
+        return 'Session crashed unexpectedly. Send a new message to restart.';
       case 'spawn_error':
         return 'Failed to start agent session. Check that the agent provider and API key are configured correctly.';
       default:
