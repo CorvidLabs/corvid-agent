@@ -16,6 +16,7 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { up as upObservations } from '../db/migrations/095_memory_observations';
+import { up as upChannelId } from '../db/migrations/120_observation_channel_id';
 import {
   boostObservation,
   dismissObservation,
@@ -37,6 +38,7 @@ function createTestDb(): Database {
   db.prepare('INSERT INTO agents (id) VALUES (?)').run(AGENT_ID);
   db.prepare('INSERT INTO sessions (id, agent_id) VALUES (?, ?)').run(SESSION_ID, AGENT_ID);
   upObservations(db);
+  upChannelId(db);
   return db;
 }
 

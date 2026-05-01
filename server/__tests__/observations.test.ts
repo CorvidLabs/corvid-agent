@@ -6,6 +6,7 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { up } from '../db/migrations/095_memory_observations';
+import { up as upChannelId } from '../db/migrations/120_observation_channel_id';
 import {
   boostObservation,
   countObservations,
@@ -29,6 +30,7 @@ function createTestDb(): Database {
   db.exec(`CREATE TABLE IF NOT EXISTS agents (id TEXT PRIMARY KEY)`);
   db.prepare('INSERT INTO agents (id) VALUES (?)').run(AGENT_ID);
   up(db);
+  upChannelId(db);
   return db;
 }
 
@@ -462,5 +464,74 @@ describe('countObservations', () => {
   test('returns zeros for unknown agent', () => {
     const counts = countObservations(db, 'unknown-agent');
     expect(counts).toEqual({ active: 0, graduated: 0, expired: 0, dismissed: 0 });
+  });
+});
+
+describe('channelId support', () => {
+  let db: Database;
+  beforeEach(() => {
+    db = createTestDb();
+  });
+
+  test('recordObservation stores channelId', () => {
+    const obs = recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'Thread message',
+      channelId: 'thread-123',
+    });
+    expect(obs.channelId).toBe('thread-123');
+  });
+
+  test('recordObservation defaults channelId to null', () => {
+    const obs = recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'session',
+      content: 'No channel',
+    });
+    expect(obs.channelId).toBeNull();
+  });
+
+  test('listObservations filters by channelId', () => {
+    recordObservation(db, { agentId: AGENT_ID, source: 'discord', content: 'Thread A msg 1', channelId: 'thread-a' });
+    recordObservation(db, { agentId: AGENT_ID, source: 'discord', content: 'Thread A msg 2', channelId: 'thread-a' });
+    recordObservation(db, { agentId: AGENT_ID, source: 'discord', content: 'Thread B msg 1', channelId: 'thread-b' });
+    recordObservation(db, { agentId: AGENT_ID, source: 'discord', content: 'Global obs' });
+
+    const threadA = listObservations(db, AGENT_ID, { channelId: 'thread-a' });
+    expect(threadA).toHaveLength(2);
+    expect(threadA.every((o) => o.channelId === 'thread-a')).toBe(true);
+
+    const threadB = listObservations(db, AGENT_ID, { channelId: 'thread-b' });
+    expect(threadB).toHaveLength(1);
+    expect(threadB[0].content).toBe('Thread B msg 1');
+  });
+
+  test('listObservations without channelId returns all observations', () => {
+    recordObservation(db, { agentId: AGENT_ID, source: 'discord', content: 'With channel', channelId: 'thread-x' });
+    recordObservation(db, { agentId: AGENT_ID, source: 'session', content: 'Without channel' });
+
+    const all = listObservations(db, AGENT_ID);
+    expect(all).toHaveLength(2);
+  });
+
+  test('channelId filter combines with status filter', () => {
+    const obs1 = recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'Active in thread',
+      channelId: 'thread-c',
+    });
+    const obs2 = recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'Graduated in thread',
+      channelId: 'thread-c',
+    });
+    markGraduated(db, obs2.id, 'grad-key');
+
+    const active = listObservations(db, AGENT_ID, { channelId: 'thread-c', status: 'active' });
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(obs1.id);
   });
 });
