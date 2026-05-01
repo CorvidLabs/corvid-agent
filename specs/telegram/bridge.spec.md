@@ -19,7 +19,7 @@ depends_on:
 
 ## Purpose
 
-Bidirectional Telegram bot bridge that routes Telegram messages to agent sessions and sends responses back. Supports text messages, voice notes (via OpenAI Whisper STT), voice responses (via OpenAI TTS), slash commands (`/start`, `/status`, `/new`), per-user rate limiting, and user authorization. Uses long-polling against the Telegram Bot API — no webhook server required.
+Bidirectional Telegram bot bridge that routes Telegram messages to agent sessions and sends responses back. Supports text messages, voice notes (via OpenAI Whisper STT), voice responses (via OpenAI TTS), slash commands (`/start`, `/status`, `/new`, `/compact`), per-user rate limiting, and user authorization. Uses long-polling against the Telegram Bot API — no webhook server required.
 
 ## Public API
 
@@ -74,8 +74,11 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 11. **Voice responses**: If the agent has `voiceEnabled` and `OPENAI_API_KEY` is set, responses are sent as voice notes via `synthesizeWithCache`, with text sent alongside for accessibility. Falls back to text-only on voice synthesis failure
 12. **Message chunking**: Telegram has a 4096-character limit per message. Long responses are split into chunks at that boundary
 13. **Agent selection**: When creating a new session, the bridge uses the first agent from `listAgents`. If the agent has a `defaultProjectId`, that project is used; otherwise the first project from `listProjects`
-14. **Slash commands**: `/start` sends a welcome message, `/status` reports the current session ID, `/new` clears the user's session mapping
+14. **Slash commands**: `/start` sends a welcome message, `/status` reports the current session ID, `/new` clears the user's session mapping, `/compact` triggers context compaction on the active session — clears the session mapping and confirms to the user; if no active session, replies with an error
 15. **Idempotent start**: Calling `start()` when already running is a no-op
+16. **Session error handling**: When a `session_error` event is received on the subscription, the bridge sends a user-facing message matching the `errorType` (`context_compacted`, `context_exhausted`, `credits_exhausted`, `timeout`, `crash`, or a fallback for unknown types), then unsubscribes the callback
+17. **Session exit handling**: When a `session_exited` event is received, the bridge flushes any buffered output and unsubscribes the callback
+18. **Subscription cleanup**: The subscription callback is stored by reference and explicitly unsubscribed via `processManager.unsubscribe()` after receiving a `result`, `session_error`, or `session_exited` event — preventing listener leaks on long-running bridges
 
 ## Behavioral Examples
 
@@ -121,6 +124,30 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 - **When** the response is flushed
 - **Then** two messages are sent: one with 4096 characters and one with 904 characters
 
+### Scenario: /compact with active session
+
+- **Given** user 12345 has an active session
+- **When** user sends `/compact`
+- **Then** `processManager.compactSession(sessionId)` is called, the session mapping is cleared, and the bridge replies `"Context compacted — session condensed. Send a message to continue with fresh context."`
+
+### Scenario: /compact with no session
+
+- **Given** user 12345 has no active session
+- **When** user sends `/compact`
+- **Then** the bridge replies `"No active session. Start a conversation first."` and does not call `compactSession`
+
+### Scenario: Session crash mid-conversation
+
+- **Given** user 12345 is in an active conversation
+- **When** the session emits a `session_error` event with `errorType: "crash"`
+- **Then** the bridge sends `"Session crashed — send a message to restart."` to the Telegram chat and unsubscribes the callback
+
+### Scenario: Context exhausted
+
+- **Given** user 12345 is in an active conversation
+- **When** the session emits a `session_error` event with `errorType: "context_exhausted"`
+- **Then** the bridge sends `"Context limit reached — send a message to start a new session."` to the Telegram chat and unsubscribes the callback
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -135,6 +162,13 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | Telegram API call fails | Logs error, throws with `"Telegram API error ({method}): status {code}"` |
 | Poll error | Logs error, continues polling on next cycle |
 | Voice synthesis fails | Falls back to text message |
+| `session_error` (context_exhausted) | Sends `"Context limit reached — send a message to start a new session."` |
+| `session_error` (credits_exhausted) | Sends `"Credits exhausted — top up credits and send a message to resume."` |
+| `session_error` (crash) | Sends `"Session crashed — send a message to restart."` |
+| `session_error` (timeout) | Sends `"Session timed out — send a message to restart."` |
+| `session_error` (context_compacted) | Sends `"Context compacted — session condensed. Send a message to continue."` |
+| `/compact` with no session | Replies `"No active session. Start a conversation first."` |
+| `/compact` with no running process | Replies `"No active session process to compact."` |
 
 ## Dependencies
 
@@ -142,7 +176,7 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe |
+| `server/process/manager.ts` | `ProcessManager` — startProcess, sendMessage, subscribe, unsubscribe, compactSession |
 | `server/db/agents.ts` | `getAgent`, `listAgents` |
 | `server/db/sessions.ts` | `createSession`, `getSession` |
 | `server/db/projects.ts` | `listProjects` |
