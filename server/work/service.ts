@@ -916,6 +916,62 @@ export class WorkTaskService {
     return this.executeTask(resetTask, agent, project);
   }
 
+  /**
+   * Resume or cancel a task that is in the `escalation_needed` state.
+   * - `retry`: restart the task from scratch (same model tier)
+   * - `retry_opus`: restart with the Opus model tier override
+   * - `cancel`: mark the task as failed
+   */
+  async escalateResume(
+    id: string,
+    action: 'retry' | 'retry_opus' | 'cancel',
+    tenantId?: string,
+  ): Promise<WorkTask | null> {
+    if (this._shuttingDown) {
+      throw new ValidationError('Server is shutting down — escalation is not accepted');
+    }
+
+    const task = getWorkTask(this.db, id, tenantId);
+    if (!task) return null;
+
+    if (task.status !== 'escalation_needed') {
+      throw new ValidationError('Only escalation_needed tasks can be escalated', { taskId: id, status: task.status });
+    }
+
+    if (action === 'cancel') {
+      updateWorkTaskStatus(this.db, id, 'failed', { error: 'Cancelled by owner after escalation' });
+      recordAudit(this.db, 'work_task_escalate_cancel', task.agentId, 'work_task', id, 'Cancelled via escalation');
+      return getWorkTask(this.db, id) ?? task;
+    }
+
+    const agent = getAgent(this.db, task.agentId, tenantId);
+    if (!agent) throw new NotFoundError('Agent', task.agentId);
+
+    const project = getProject(this.db, task.projectId, tenantId);
+    if (!project?.workingDir) throw new NotFoundError('Project', task.projectId);
+
+    if (action === 'retry_opus') {
+      this.storeTierOverride(id, 'opus');
+    }
+
+    resetWorkTaskForRetry(this.db, id);
+
+    log.info('Escalation: resuming work task', { taskId: id, action });
+    recordAudit(
+      this.db,
+      'work_task_escalate_resume',
+      task.agentId,
+      'work_task',
+      id,
+      `Resumed via escalation (action: ${action})`,
+    );
+
+    const resetTask = getWorkTask(this.db, id);
+    if (!resetTask) return null;
+
+    return this.executeTask(resetTask, agent, project);
+  }
+
   async cancelTask(id: string): Promise<WorkTask | null> {
     const task = getWorkTask(this.db, id);
     if (!task) return null;

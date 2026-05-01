@@ -82,6 +82,6 @@ export { handleExtendTimeout } from './session';
 // ─── Shared types & helpers ──────────────────────────────────────────────────
 export { errorResult, type McpToolContext, textResult } from './types';
 // ─── Work tasks ──────────────────────────────────────────────────────────────
-export { handleCheckWorkStatus, handleCreateWorkTask, handleListWorkTasks } from './work';
+export { handleCheckWorkStatus, handleCreateWorkTask, handleEscalateWorkTask, handleListWorkTasks } from './work';
 // ─── Workflows ───────────────────────────────────────────────────────────────
 export { handleManageWorkflow } from './workflow';

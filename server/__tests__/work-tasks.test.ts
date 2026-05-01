@@ -406,3 +406,65 @@ describe('resetWorkTaskForRetry', () => {
     expect(reset.projectId).toBe(PROJECT_ID);
   });
 });
+
+// ── escalation_needed status ──────────────────────────────────────────
+
+describe('escalation_needed status', () => {
+  test('updateWorkTaskStatus can set escalation_needed with error and summary', () => {
+    const task = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Failing task' });
+    updateWorkTaskStatus(db, task.id, 'running', { iterationCount: 3 });
+    updateWorkTaskStatus(db, task.id, 'escalation_needed', {
+      error: 'Validation failed after 3 iteration(s):\ntsc error',
+      summary: 'Agent tried but failed',
+    });
+
+    const updated = getWorkTask(db, task.id)!;
+    expect(updated.status).toBe('escalation_needed');
+    expect(updated.error).toContain('Validation failed after 3');
+    expect(updated.summary).toBe('Agent tried but failed');
+    expect(updated.iterationCount).toBe(3);
+    expect(updated.completedAt).toBeNull();
+  });
+
+  test('cleanupStaleWorkTasks does not affect escalation_needed tasks', () => {
+    const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Running task' });
+    const t2 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Escalated task' });
+    updateWorkTaskStatus(db, t1.id, 'running');
+    updateWorkTaskStatus(db, t2.id, 'escalation_needed', { error: 'Needs owner attention' });
+
+    const stale = cleanupStaleWorkTasks(db);
+    expect(stale).toHaveLength(1);
+    expect(stale[0].id).toBe(t1.id);
+
+    expect(getWorkTask(db, t1.id)!.status).toBe('failed');
+    expect(getWorkTask(db, t2.id)!.status).toBe('escalation_needed');
+  });
+
+  test('resetWorkTaskForRetry resets escalation_needed task to pending', () => {
+    const task = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Escalated task' });
+    updateWorkTaskStatus(db, task.id, 'escalation_needed', {
+      error: 'Validation failed after 3 iteration(s)',
+      iterationCount: 3,
+    });
+
+    resetWorkTaskForRetry(db, task.id);
+
+    const reset = getWorkTask(db, task.id)!;
+    expect(reset.status).toBe('pending');
+    expect(reset.error).toBeNull();
+    expect(reset.iterationCount).toBe(0);
+    expect(reset.completedAt).toBeNull();
+  });
+
+  test('listWorkTasks includes escalation_needed tasks', () => {
+    const t1 = createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Escalated' });
+    createWorkTask(db, { agentId: AGENT_ID, projectId: PROJECT_ID, description: 'Pending' });
+    updateWorkTaskStatus(db, t1.id, 'escalation_needed', { error: 'Needs owner review' });
+
+    const all = listWorkTasks(db);
+    expect(all).toHaveLength(2);
+    const statuses = all.map((t) => t.status).sort();
+    expect(statuses).toContain('escalation_needed');
+    expect(statuses).toContain('pending');
+  });
+});
