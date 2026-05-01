@@ -196,10 +196,10 @@ function formatTokenCount(tokens: number): string {
 
 /**
  * Build a detailed footer string with full session context.
- * Format: `AgentName · model · project · sid:XXXXXX · status | 🟢 32% (64k/200k)`
+ * Format: `AgentName · model · project · sid:XXXXXX · status | T:5 | 🟢 32% (64k/200k)`
  * Segments are omitted when their value is not provided.
  */
-export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage): string {
+export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage, turns?: number): string {
   const parts: string[] = [ctx.agentName];
   if (ctx.agentModel) {
     parts.push(ctx.agentModel);
@@ -214,10 +214,14 @@ export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage)
     parts.push(ctx.status);
   }
   const base = parts.join(' · ');
-  if (contextUsage) {
-    return `${base} | ${formatContextUsage(contextUsage)}`;
+  const segments: string[] = [base];
+  if (turns && turns > 0) {
+    segments.push(`T:${turns}`);
   }
-  return base;
+  if (contextUsage) {
+    segments.push(formatContextUsage(contextUsage));
+  }
+  return segments.join(' | ');
 }
 
 /**

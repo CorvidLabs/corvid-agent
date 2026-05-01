@@ -1080,6 +1080,9 @@ export class ProcessManager {
 
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
+      const newTurns = (session.totalTurns ?? 0) + 1;
+      updateSessionTurns(this.db, session.id, newTurns);
+      session.totalTurns = newTurns;
     }
 
     const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
