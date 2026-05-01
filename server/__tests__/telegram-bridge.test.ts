@@ -80,6 +80,17 @@ function makeResultEvent(): ClaudeStreamEvent {
   } as ClaudeStreamEvent;
 }
 
+function makeSessionErrorEvent(errorType: string): ClaudeStreamEvent {
+  return {
+    type: 'session_error',
+    error: { message: `Session error: ${errorType}`, errorType, severity: 'error', recoverable: false },
+  } as ClaudeStreamEvent;
+}
+
+function makeSessionExitedEvent(): ClaudeStreamEvent {
+  return { type: 'session_exited' } as ClaudeStreamEvent;
+}
+
 function mockApiCapture(bridge: TelegramBridge): string[] {
   const sentMessages: string[] = [];
   internals(bridge).callTelegramApi = mock(async (_method: string, body: Record<string, unknown>) => {
@@ -261,6 +272,46 @@ describe('rate limiting', () => {
     );
     expect(sentMessages.some((m) => m.includes('Rate limit exceeded'))).toBe(true);
     expect(pm.startProcess).not.toHaveBeenCalled();
+  });
+});
+
+describe('/compact command', () => {
+  test('/compact with no active session sends error', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentMessages = mockApiCapture(bridge);
+    await internals(bridge).handleMessage(
+      makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: '/compact' }),
+    );
+    expect(sentMessages.some((m) => m.includes('No active session'))).toBe(true);
+    expect(pm.startProcess).not.toHaveBeenCalled();
+  });
+
+  test('/compact with active session calls compactSession and clears mapping', async () => {
+    const pm = createMockProcessManager();
+    (pm as any).compactSession = mock(() => true);
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    internals(bridge).userSessions.set(100, 'sess-abc');
+    const sentMessages = mockApiCapture(bridge);
+    await internals(bridge).handleMessage(
+      makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: '/compact' }),
+    );
+    expect((pm as any).compactSession).toHaveBeenCalledWith('sess-abc');
+    expect(internals(bridge).userSessions.has(100)).toBe(false);
+    expect(sentMessages.some((m) => m.includes('Context compacted'))).toBe(true);
+  });
+
+  test('/compact when compactSession returns false sends no-process message', async () => {
+    const pm = createMockProcessManager();
+    (pm as any).compactSession = mock(() => false);
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    internals(bridge).userSessions.set(100, 'sess-abc');
+    const sentMessages = mockApiCapture(bridge);
+    await internals(bridge).handleMessage(
+      makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: '/compact' }),
+    );
+    expect(sentMessages.some((m) => m.includes('No active session process'))).toBe(true);
+    expect(internals(bridge).userSessions.has(100)).toBe(true);
   });
 });
 
@@ -651,6 +702,106 @@ describe('subscribeForResponse', () => {
     holder.cb!(session.id, makeResultEvent());
     await new Promise((r) => setTimeout(r, 100));
     expect(sentTexts.some((m) => m === 'Object message')).toBe(true);
+  });
+
+  test('unsubscribes after result event', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
+  });
+
+  test('sends error message and unsubscribes on session_error (crash)', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionErrorEvent('crash'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentTexts.some((m) => m.includes('Session crashed'))).toBe(true);
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
+  });
+
+  test('sends error message on session_error (context_exhausted)', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionErrorEvent('context_exhausted'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentTexts.some((m) => m.includes('Context limit reached'))).toBe(true);
+  });
+
+  test('sends error message on session_error (credits_exhausted)', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionErrorEvent('credits_exhausted'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentTexts.some((m) => m.includes('Credits exhausted'))).toBe(true);
+  });
+
+  test('sends error message on session_error (timeout)', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionErrorEvent('timeout'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentTexts.some((m) => m.includes('Session timed out'))).toBe(true);
+  });
+
+  test('sends error message on session_error (context_compacted)', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionErrorEvent('context_compacted'));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(sentTexts.some((m) => m.includes('Context compacted'))).toBe(true);
+  });
+
+  test('unsubscribes on session_exited without sending error', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, { projectId: project.id, agentId: agent.id, name: 'Test', source: 'telegram' });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeSessionExitedEvent());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
+    expect(sentTexts).toHaveLength(0);
   });
 });
 

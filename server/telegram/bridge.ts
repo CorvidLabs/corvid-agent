@@ -11,6 +11,7 @@ import { type DeliveryTracker, getDeliveryTracker } from '../lib/delivery-tracke
 import { ExternalServiceError, NotFoundError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
 import { scanForInjection } from '../lib/prompt-injection';
+import type { EventCallback } from '../process/interfaces';
 import type { ProcessManager } from '../process/manager';
 import { transcribe } from '../voice/stt';
 import { synthesizeWithCache } from '../voice/tts';
@@ -233,6 +234,26 @@ export class TelegramBridge {
       return;
     }
 
+    // Handle /compact command — compact session context
+    if (text === '/compact') {
+      const sessionId = this.userSessions.get(userId);
+      if (!sessionId) {
+        await this.sendText(message.chat.id, 'No active session. Start a conversation first.');
+        return;
+      }
+      const compacted = this.processManager.compactSession(sessionId);
+      if (compacted) {
+        this.userSessions.delete(userId);
+        await this.sendText(
+          message.chat.id,
+          'Context compacted — session condensed. Send a message to continue with fresh context.',
+        );
+      } else {
+        await this.sendText(message.chat.id, 'No active session process to compact.');
+      }
+      return;
+    }
+
     // Route based on mode
     if (this.mode === 'work_intake') {
       await this.handleWorkIntake(message.chat.id, userId, text, message.message_id);
@@ -412,7 +433,7 @@ export class TelegramBridge {
       }
     };
 
-    this.processManager.subscribe(sessionId, (_sid, event) => {
+    const callback: EventCallback = (_sid, event) => {
       if (event.type === 'assistant' && event.message) {
         const content =
           typeof event.message === 'string' ? event.message : ((event.message as { content?: string })?.content ?? '');
@@ -429,8 +450,44 @@ export class TelegramBridge {
       if (event.type === 'result') {
         if (debounceTimer) clearTimeout(debounceTimer);
         flush();
+        this.processManager.unsubscribe(sessionId, callback);
       }
-    });
+
+      if (event.type === 'session_error' || event.type === 'session_exited') {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        flush();
+
+        if (event.type === 'session_error') {
+          const errEvent = event as { error?: { message?: string; errorType?: string } };
+          const errorType = errEvent.error?.errorType ?? 'unknown';
+          let msg: string;
+          switch (errorType) {
+            case 'context_compacted':
+              msg = 'Context compacted — session condensed. Send a message to continue.';
+              break;
+            case 'context_exhausted':
+              msg = 'Context limit reached — send a message to start a new session.';
+              break;
+            case 'credits_exhausted':
+              msg = 'Credits exhausted — top up credits and send a message to resume.';
+              break;
+            case 'timeout':
+              msg = 'Session timed out — send a message to restart.';
+              break;
+            case 'crash':
+              msg = 'Session crashed — send a message to restart.';
+              break;
+            default:
+              msg = (errEvent.error?.message ?? 'Session error — send a message to restart.').slice(0, 4096);
+          }
+          this.sendText(chatId, msg).catch(() => {});
+        }
+
+        this.processManager.unsubscribe(sessionId, callback);
+      }
+    };
+
+    this.processManager.subscribe(sessionId, callback);
   }
 
   async sendText(chatId: number, text: string, replyTo?: number): Promise<void> {
