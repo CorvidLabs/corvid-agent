@@ -52,6 +52,7 @@ files:
   - server/db/migrations/122_memory_attestations.ts
   - server/db/migrations/123_council_min_trust_level.ts
   - server/db/migrations/123_activity_summaries.ts
+  - server/db/migrations/124_session_context_tokens.ts
 db_tables:
   - schema_version
 depends_on: []
