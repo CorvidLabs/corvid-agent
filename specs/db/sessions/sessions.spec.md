@@ -35,6 +35,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionPid` | `(db: Database, id: string, pid: number \| null)` | `void` | Update the OS process ID (null when process exits) |
 | `updateSessionStatus` | `(db: Database, id: string, status: string)` | `void` | Set session status (idle, running, stopped, error, paused) |
 | `updateSessionCost` | `(db: Database, id: string, costUsd: number, turns: number)` | `void` | Update cumulative cost and turn count |
+| `getSessionTurns` | `(db: Database, id: string)` | `number` | Lightweight read of `total_turns` for a session (returns 0 if not found) |
 | `updateSessionTurns` | `(db: Database, id: string, turns: number)` | `void` | Update turn count independently of cost (for immediate persistence on user message) |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
 | `updateSessionContextTokens` | `(db: Database, id: string, tokens: number, contextWindow: number)` | `void` | Persist real context token count and window size from API |
@@ -127,6 +128,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `server/scheduler/service.ts` | `createSession` |
 | `server/routes/sessions.ts` | All session CRUD functions |
 | `server/algochat/bridge.ts` | Conversation CRUD functions |
+| `server/discord/thread-response/embed-response.ts` | `getSessionTurns` |
 
 ## Database Tables
 

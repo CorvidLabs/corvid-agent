@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import { getSessionTurns } from '../../db/sessions';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
 import { createLogger } from '../../lib/logger';
 import type { EventCallback } from '../../process/interfaces';
@@ -76,11 +77,14 @@ export function subscribeForResponseWithEmbed(
 
   /** Post or upgrade the progress message. First call sends it, subsequent calls edit it. */
   const updateProgressMessage = async (description: string, status: string, embedColor?: number) => {
+    const turns = getSessionTurns(db, sessionId);
     const embed = {
       description,
       color: embedColor ?? 0x95a5a6,
       author,
-      footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }, latestContextUsage) },
+      footer: {
+        text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }, latestContextUsage, turns),
+      },
     };
     if (progressMessageId) {
       await editEmbed(delivery, botToken, threadId, progressMessageId, embed);
@@ -122,6 +126,7 @@ export function subscribeForResponseWithEmbed(
         // If we have an existing progress message, update it to show the crash.
         // Otherwise send a new embed.
         if (progressMessageId) {
+          const crashTurns = getSessionTurns(db, sessionId);
           editEmbed(delivery, botToken, threadId, progressMessageId, {
             description: 'The agent session ended unexpectedly. Send a message to resume.',
             color: 0xff3355,
@@ -130,6 +135,7 @@ export function subscribeForResponseWithEmbed(
               text: buildFooterText(
                 { agentName, agentModel, sessionId, projectName, status: 'crashed' },
                 latestContextUsage,
+                crashTurns,
               ),
             },
           }).catch((err) => {
@@ -139,6 +145,7 @@ export function subscribeForResponseWithEmbed(
             });
           });
         } else {
+          const crashTurns = getSessionTurns(db, sessionId);
           sendEmbedWithButtons(
             delivery,
             botToken,
@@ -151,6 +158,7 @@ export function subscribeForResponseWithEmbed(
                 text: buildFooterText(
                   { agentName, agentModel, sessionId, projectName, status: 'crashed' },
                   latestContextUsage,
+                  crashTurns,
                 ),
               },
             },
@@ -197,13 +205,14 @@ export function subscribeForResponseWithEmbed(
     const text = buffer;
     buffer = '';
 
+    const turns = getSessionTurns(db, sessionId);
     const parts = visibleEmbedParts(text);
     for (const part of parts) {
       await sendEmbed(delivery, botToken, threadId, {
         description: part,
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
+        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage, turns) },
       });
     }
   };
@@ -228,6 +237,7 @@ export function subscribeForResponseWithEmbed(
               : 'png';
       const filename = `image.${ext}`;
       const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
+      const imgTurns = getSessionTurns(db, sessionId);
       await sendEmbedWithFiles(
         delivery,
         botToken,
@@ -236,7 +246,9 @@ export function subscribeForResponseWithEmbed(
           image: { url: `attachment://${filename}` },
           color,
           author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
+          footer: {
+            text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage, imgTurns),
+          },
         },
         [attachment],
       );
@@ -322,6 +334,7 @@ export function subscribeForResponseWithEmbed(
     if (event.type === 'context_warning') {
       const warning = event as { level?: string; message?: string; usagePercent?: number };
       if (warning.level === 'critical') {
+        const warnTurns = getSessionTurns(db, sessionId);
         sendEmbed(delivery, botToken, threadId, {
           description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
           color: 0xf0b232, // yellow/warning
@@ -330,6 +343,7 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: 'context warning' },
               latestContextUsage,
+              warnTurns,
             ),
           },
         }).catch((err) => {
@@ -350,6 +364,7 @@ export function subscribeForResponseWithEmbed(
 
       // Mark the progress message as done (if it exists) before sending the completion embed
       if (progressMessageId) {
+        const doneTurns = getSessionTurns(db, sessionId);
         editEmbed(delivery, botToken, threadId, progressMessageId, {
           description: '✅ Done',
           color: 0x57f287,
@@ -358,6 +373,7 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: 'done' },
               latestContextUsage,
+              doneTurns,
             ),
           },
         }).catch((err) => {
@@ -518,6 +534,7 @@ export function subscribeForResponseWithEmbed(
       const { title, description, color: errColor } = sessionErrorEmbed(errorType, errEvent.error?.message);
 
       // If we have a progress message, update it to show the error; otherwise send new
+      const errTurns = getSessionTurns(db, sessionId);
       if (progressMessageId) {
         editEmbed(delivery, botToken, threadId, progressMessageId, {
           title,
@@ -528,6 +545,7 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: errorType },
               latestContextUsage,
+              errTurns,
             ),
           },
         }).catch((err) => {
@@ -550,6 +568,7 @@ export function subscribeForResponseWithEmbed(
               text: buildFooterText(
                 { agentName, agentModel, sessionId, projectName, status: errorType },
                 latestContextUsage,
+                errTurns,
               ),
             },
           },

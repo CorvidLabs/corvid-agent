@@ -212,6 +212,11 @@ export function updateSessionCost(db: Database, id: string, costUsd: number, tur
   );
 }
 
+export function getSessionTurns(db: Database, id: string): number {
+  const row = db.query('SELECT total_turns FROM sessions WHERE id = ?').get(id) as { total_turns: number } | null;
+  return row?.total_turns ?? 0;
+}
+
 export function updateSessionTurns(db: Database, id: string, turns: number): void {
   db.query("UPDATE sessions SET total_turns = ?, updated_at = datetime('now') WHERE id = ?").run(turns, id);
 }
