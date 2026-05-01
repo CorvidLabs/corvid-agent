@@ -800,16 +800,16 @@ export class ProcessManager {
 
     const effectiveProject = { ...project, workingDir: resolved.dir };
 
-    // Save the user message and increment turn count
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
-      const newTurns = (session.totalTurns ?? 0) + 1;
-      updateSessionTurns(this.db, session.id, newTurns);
-      session.totalTurns = newTurns;
-      const existingMeta = this.sessionMeta.get(session.id);
-      if (existingMeta) existingMeta.turnCount = newTurns;
     }
-    const resumePrompt = this.buildResumePrompt(session, prompt);
+    const { prompt: resumePrompt, activeTurns } = this.buildResumePrompt(session, prompt);
+
+    // Reset turn count to reflect only what's actually in active context
+    session.totalTurns = activeTurns;
+    updateSessionTurns(this.db, session.id, activeTurns);
+    const existingMeta = this.sessionMeta.get(session.id);
+    if (existingMeta) existingMeta.turnCount = activeTurns;
 
     // Resolve agent and provider
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
@@ -831,6 +831,10 @@ export class ProcessManager {
         }
       }
     }
+
+    // Estimate context tokens from actual resume prompt instead of stale pre-restart values
+    session.lastContextTokens = estimateTokens(resumePrompt);
+    session.lastContextWindow = getContextBudget(effectiveAgent?.model);
 
     // Reuse startProcessWithResolvedDir — it handles SDK vs direct routing + registration
     await this.startProcessWithResolvedDir(session, effectiveProject, effectiveAgent, resumePrompt ?? '', provider, {
@@ -1076,14 +1080,19 @@ export class ProcessManager {
 
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
-    const resumePrompt = this.buildResumePrompt(session, prompt);
+    const { prompt: resumePrompt, activeTurns } = this.buildResumePrompt(session, prompt);
 
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
-      const newTurns = (session.totalTurns ?? 0) + 1;
-      updateSessionTurns(this.db, session.id, newTurns);
-      session.totalTurns = newTurns;
     }
+
+    // Reset turn count to reflect only what's actually in active context
+    session.totalTurns = activeTurns + (prompt ? 1 : 0);
+    updateSessionTurns(this.db, session.id, session.totalTurns);
+
+    // Estimate context tokens from actual resume prompt instead of stale pre-restart values
+    session.lastContextTokens = estimateTokens(resumePrompt ?? '');
+    session.lastContextWindow = getContextBudget(effectiveAgent?.model);
 
     const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
     const registry = LlmProviderRegistry.getInstance();
@@ -1301,7 +1310,7 @@ export class ProcessManager {
     return true;
   }
 
-  private buildResumePrompt(session: Session, newPrompt?: string): string {
+  private buildResumePrompt(session: Session, newPrompt?: string): { prompt: string; activeTurns: number } {
     const messages = getSessionMessages(this.db, session.id);
     const meta = this.sessionMeta.get(session.id);
 
@@ -1327,9 +1336,10 @@ export class ProcessManager {
       boostObservation(this.db, obs.id, 0);
     }
 
-    if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
+    if (messages.length === 0) return { prompt: newPrompt ?? session.initialPrompt ?? '', activeTurns: 0 };
 
     const recent = messages.slice(-20);
+    const activeTurns = recent.filter((m) => m.role === 'user').length;
     const historyLines = recent
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => {
@@ -1382,7 +1392,7 @@ export class ProcessManager {
       parts.push('', newPrompt);
     }
 
-    return parts.join('\n');
+    return { prompt: parts.join('\n'), activeTurns };
   }
 
   stopProcess(sessionId: string, reason?: string): void {
