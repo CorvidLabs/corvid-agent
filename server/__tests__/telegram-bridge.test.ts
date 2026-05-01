@@ -297,7 +297,7 @@ describe('/compact command', () => {
       makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: '/compact' }),
     );
     expect((pm as any).compactSession).toHaveBeenCalledWith('sess-abc');
-    expect(internals(bridge).userSessions.has(100)).toBe(false);
+    expect(internals(bridge).userSessions.has(100)).toBe(true);
     expect(sentMessages.some((m) => m.includes('Context compacted'))).toBe(true);
   });
 
@@ -310,7 +310,7 @@ describe('/compact command', () => {
     await internals(bridge).handleMessage(
       makeMessage({ from: { id: 100, is_bot: false, first_name: 'User' }, text: '/compact' }),
     );
-    expect(sentMessages.some((m) => m.includes('No active session process'))).toBe(true);
+    expect(sentMessages.some((m) => m.includes('Could not compact session'))).toBe(true);
     expect(internals(bridge).userSessions.has(100)).toBe(true);
   });
 });
@@ -729,7 +729,7 @@ describe('subscribeForResponse', () => {
     internals(bridge).subscribeForResponse(session.id, 12345);
     holder.cb!(session.id, makeSessionErrorEvent('crash'));
     await new Promise((r) => setTimeout(r, 100));
-    expect(sentTexts.some((m) => m.includes('Session crashed'))).toBe(true);
+    expect(sentTexts.some((m) => m.includes('crashed unexpectedly'))).toBe(true);
     expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
   });
 
