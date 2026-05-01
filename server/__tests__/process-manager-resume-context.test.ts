@@ -276,3 +276,69 @@ describe('turn count reset on resume', () => {
     expect(result.activeTurns).toBe(2);
   });
 });
+
+describe('applyResumeMetrics', () => {
+  test('updates session totalTurns and persists to DB', () => {
+    const session = getSession(db, sessionId)!;
+    expect(session.totalTurns).toBe(0);
+
+    (pm as any).applyResumeMetrics(session, 5, 'some prompt text');
+
+    expect(session.totalTurns).toBe(5);
+    const dbSession = getSession(db, sessionId)!;
+    expect(dbSession.totalTurns).toBe(5);
+  });
+
+  test('updates sessionMeta turnCount when meta exists', () => {
+    (pm as any).sessionMeta.set(sessionId, {
+      turnCount: 0,
+      startedAt: Date.now(),
+      lastActivityAt: Date.now(),
+    });
+
+    const session = getSession(db, sessionId)!;
+    (pm as any).applyResumeMetrics(session, 7, 'prompt');
+
+    const meta = (pm as any).sessionMeta.get(sessionId);
+    expect(meta.turnCount).toBe(7);
+  });
+
+  test('does not throw when sessionMeta has no entry', () => {
+    const session = getSession(db, sessionId)!;
+    expect(() => (pm as any).applyResumeMetrics(session, 3, 'prompt')).not.toThrow();
+    expect(session.totalTurns).toBe(3);
+  });
+
+  test('sets lastContextTokens from resume prompt', () => {
+    const session = getSession(db, sessionId)!;
+    (pm as any).applyResumeMetrics(session, 2, 'Hello world, this is a test prompt.');
+
+    expect(session.lastContextTokens).toBeGreaterThan(0);
+  });
+
+  test('sets lastContextWindow from agent model', () => {
+    const session = getSession(db, sessionId)!;
+    (pm as any).applyResumeMetrics(session, 1, 'prompt', 'claude-sonnet-4-6-20250514');
+
+    expect(session.lastContextWindow).toBeGreaterThan(0);
+  });
+
+  test('sets default lastContextWindow when no model specified', () => {
+    const session = getSession(db, sessionId)!;
+    (pm as any).applyResumeMetrics(session, 1, 'prompt');
+
+    expect(session.lastContextWindow).toBe(128_000);
+  });
+
+  test('token estimate scales with prompt length', () => {
+    const session = getSession(db, sessionId)!;
+
+    (pm as any).applyResumeMetrics(session, 1, 'short');
+    const smallTokens = session.lastContextTokens!;
+
+    (pm as any).applyResumeMetrics(session, 1, 'a '.repeat(500));
+    const largeTokens = session.lastContextTokens!;
+
+    expect(largeTokens).toBeGreaterThan(smallTokens);
+  });
+});
