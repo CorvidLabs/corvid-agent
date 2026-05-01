@@ -19,6 +19,7 @@ import {
   handleDeepResearch,
   handleDeleteMemory,
   handleDiscoverAgent,
+  handleEscalateWorkTask,
   handleExtendTimeout,
   handleFindReferences,
   handleFlockDirectory,
@@ -340,15 +341,29 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
           ),
           tool(
             'corvid_list_work_tasks',
-            'List work tasks for this agent. Optionally filter by status (pending, branching, running, validating, completed, failed).',
+            'List work tasks for this agent. Optionally filter by status (pending, branching, running, validating, completed, failed, escalation_needed).',
             {
               status: z
                 .string()
                 .optional()
-                .describe('Filter by status: pending, branching, running, validating, completed, failed'),
+                .describe(
+                  'Filter by status: pending, branching, running, validating, completed, failed, escalation_needed',
+                ),
               limit: z.number().optional().describe('Maximum number of tasks to return (default 20, max 50)'),
             },
             async (args) => handleListWorkTasks(ctx, args),
+          ),
+          tool(
+            'corvid_work_task_escalate',
+            'Resume or cancel a work task that is in the escalation_needed state (i.e. failed validation after max iterations). ' +
+              'Use action=retry to restart with the same model, retry_opus to restart with the Opus model tier, or cancel to mark as failed.',
+            {
+              task_id: z.string().describe('The work task ID in escalation_needed state'),
+              action: z
+                .enum(['retry', 'retry_opus', 'cancel'])
+                .describe('retry: restart with same model; retry_opus: restart with Opus; cancel: mark as failed'),
+            },
+            async (args) => handleEscalateWorkTask(ctx, args),
           ),
         ]
       : []),

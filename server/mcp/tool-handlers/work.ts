@@ -163,6 +163,34 @@ export async function handleCheckWorkStatus(ctx: McpToolContext, args: { task_id
   return textResult(lines.join('\n'));
 }
 
+export async function handleEscalateWorkTask(
+  ctx: McpToolContext,
+  args: { task_id: string; action: 'retry' | 'retry_opus' | 'cancel' },
+): Promise<CallToolResult> {
+  if (!ctx.workTaskService) {
+    return errorResult('Work task service is not available.');
+  }
+
+  try {
+    const result = await ctx.workTaskService.escalateResume(args.task_id, args.action);
+    if (!result) return errorResult(`Work task "${args.task_id}" not found.`);
+
+    const message =
+      args.action === 'cancel'
+        ? `Task cancelled. Status: failed.`
+        : `Task resumed. Status: ${result.status}. Use corvid_check_work_status to monitor progress.`;
+
+    return textResult(message);
+  } catch (err) {
+    log.error('MCP work_task_escalate failed', {
+      taskId: args.task_id,
+      action: args.action,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return errorResult(err instanceof Error ? err.message : String(err));
+  }
+}
+
 export async function handleListWorkTasks(
   ctx: McpToolContext,
   args: { status?: string; limit?: number },
