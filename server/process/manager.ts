@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
+import type { ObservationSource } from '../../shared/types/memories';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { saveMemory } from '../db/agent-memories';
 import { getAgent } from '../db/agents';
@@ -159,6 +160,8 @@ interface SessionMeta {
   contextSummary?: string;
   /** Last known context window usage percentage, updated on context_usage events. */
   lastContextUsagePercent?: number;
+  /** Cached channel/thread ID for observation scoping (resolved lazily on first message). */
+  channelId?: string | null;
 }
 
 export class ProcessManager {
@@ -1318,15 +1321,33 @@ export class ProcessManager {
       this.db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
     }
 
-    // Load recent active observations for this agent and increment their access count
-    // Boost observations from the same source as the current session
-    const observations = session.agentId
-      ? listObservations(this.db, session.agentId, {
+    // Load recent active observations for this agent.
+    // For channel-based sessions (Discord/Telegram/AlgoChat), load thread-specific
+    // observations first, then fill remaining slots with general agent observations.
+    const channelId = this.resolveChannelId(session.id);
+    let observations: import('../../shared/types/memories').MemoryObservation[] = [];
+    if (session.agentId) {
+      if (channelId) {
+        const channelObs = listObservations(this.db, session.agentId, {
+          status: 'active',
+          limit: 15,
+          channelId,
+        });
+        const channelIds = new Set(channelObs.map((o) => o.id));
+        const globalObs = listObservations(this.db, session.agentId, {
           status: 'active',
           limit: 10,
           sourcePreference: (['discord', 'telegram', 'algochat'] as const).find((s) => s === session.source),
-        })
-      : [];
+        }).filter((o) => !channelIds.has(o.id));
+        observations = [...channelObs, ...globalObs].slice(0, 20);
+      } else {
+        observations = listObservations(this.db, session.agentId, {
+          status: 'active',
+          limit: 10,
+          sourcePreference: (['discord', 'telegram', 'algochat'] as const).find((s) => s === session.source),
+        });
+      }
+    }
     for (const obs of observations) {
       boostObservation(this.db, obs.id, 0);
     }
@@ -1496,6 +1517,7 @@ export class ProcessManager {
             .map((b) => b.text)
             .join('\n');
     addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
+    if (textContent) this.recordMessageObservation(sessionId, 'user', textContent);
 
     const meta = this.sessionMeta.get(sessionId);
     if (meta) {
@@ -1735,6 +1757,7 @@ export class ProcessManager {
       const text = extractContentText(event.message.content);
       if (text?.trim()) {
         addSessionMessage(this.db, sessionId, 'assistant', text);
+        this.recordMessageObservation(sessionId, 'assistant', text);
       }
     }
 
@@ -2009,6 +2032,7 @@ export class ProcessManager {
       const counterparty = participant ? ` with ${participant}` : '';
       const content = `Conversation summary (${session.source ?? 'unknown'}${counterparty}, session ${session.id}):\n${summary}`;
 
+      const channelId = this.resolveChannelId(session.id);
       recordObservation(this.db, {
         agentId: session.agentId!,
         source: 'session',
@@ -2016,12 +2040,66 @@ export class ProcessManager {
         content,
         suggestedKey: `conv-summary:${session.id}`,
         relevanceScore: 2.0,
+        channelId: channelId ?? undefined,
       });
 
       log.info('Saved context summary as observation', { sessionId: session.id });
     } catch (err) {
       log.warn('Failed to save context summary observation', {
         sessionId: session.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Resolve the channel/thread ID for a session, caching in sessionMeta.
+   * For Discord: looks up the thread ID from discord_thread_sessions.
+   * Returns null for non-channel-based sessions.
+   */
+  private resolveChannelId(sessionId: string): string | null {
+    const meta = this.sessionMeta.get(sessionId);
+    if (meta && meta.channelId !== undefined) return meta.channelId ?? null;
+
+    const session = getSession(this.db, sessionId);
+    let channelId: string | null = null;
+
+    if (session?.source === 'discord') {
+      channelId = getThreadIdForSession(this.db, sessionId);
+    }
+
+    if (meta) meta.channelId = channelId;
+    return channelId;
+  }
+
+  /**
+   * Record a user or assistant message as a short-term observation.
+   * Tagged with channel_id so future resumes can recall thread-specific context.
+   */
+  private recordMessageObservation(sessionId: string, role: 'user' | 'assistant', content: string): void {
+    try {
+      const session = getSession(this.db, sessionId);
+      if (!session?.agentId) return;
+
+      const source = session.source as ObservationSource | undefined;
+      if (!source || !['discord', 'telegram', 'algochat'].includes(source)) return;
+
+      const channelId = this.resolveChannelId(sessionId);
+      const truncated = content.length > 500 ? `${content.slice(0, 500)}...` : content;
+      const prefix = role === 'user' ? 'User' : 'Assistant';
+
+      recordObservation(this.db, {
+        agentId: session.agentId,
+        source: source as ObservationSource,
+        sourceId: sessionId,
+        content: `[${prefix}]: ${truncated}`,
+        relevanceScore: 1.0,
+        channelId: channelId ?? undefined,
+      });
+    } catch (err) {
+      log.warn('Failed to record message observation', {
+        sessionId: sessionId.slice(0, 8),
+        role,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -2093,16 +2171,18 @@ export class ProcessManager {
         .filter(Boolean)
         .join(' | ');
 
+      const channelId = this.resolveChannelId(sessionId);
       recordObservation(this.db, {
         agentId: session.agentId,
         source: 'discord',
         sourceId: sessionId,
         content: summary,
         suggestedKey: `discord-session:${sessionId}`,
-        relevanceScore: 2.0, // Higher score than message observations
+        relevanceScore: 2.0,
+        channelId: channelId ?? undefined,
       });
 
-      log.debug('Recorded session completion observation', { sessionId, summary: summary.slice(0, 100) });
+      log.debug('Recorded session completion observation', { sessionId, channelId, summary: summary.slice(0, 100) });
     } catch (err) {
       log.warn('Failed to record session completion observation', {
         sessionId,

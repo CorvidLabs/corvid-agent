@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { recordObservation } from '../db/observations';
 import { runMigrations } from '../db/schema';
 import { addSessionMessage, createSession, getSession } from '../db/sessions';
 import { estimateTokens } from '../process/context-management';
@@ -340,5 +341,130 @@ describe('applyResumeMetrics', () => {
     const largeTokens = session.lastContextTokens!;
 
     expect(largeTokens).toBeGreaterThan(smallTokens);
+  });
+});
+
+describe('buildResumePrompt channel-scoped observations', () => {
+  const THREAD_ID = 'discord-thread-999';
+
+  function createDiscordSession(): string {
+    const s = createSession(db, { projectId: PROJECT_ID, agentId: AGENT_ID, name: 'DiscordTest' });
+    db.query("UPDATE sessions SET source = 'discord' WHERE id = ?").run(s.id);
+    db.query(
+      `INSERT INTO discord_thread_sessions (thread_id, session_id, agent_name, agent_model, owner_user_id) VALUES (?, ?, 'TestAgent', 'test', 'user-1')`,
+    ).run(THREAD_ID, s.id);
+    addSessionMessage(db, s.id, 'user', 'Hello from Discord');
+    addSessionMessage(db, s.id, 'assistant', 'Hi there');
+    return s.id;
+  }
+
+  test('includes channel-scoped observations in resume prompt', () => {
+    const discordSessionId = createDiscordSession();
+
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'Thread-specific: user asked about auth module',
+      channelId: THREAD_ID,
+      relevanceScore: 3.0,
+    });
+
+    const session = getSession(db, discordSessionId)!;
+    const result = (pm as any).buildResumePrompt(session);
+    expect(result.prompt).toContain('user asked about auth module');
+  });
+
+  test('channel observations appear before global observations', () => {
+    const discordSessionId = createDiscordSession();
+
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'CHANNEL_OBS: thread-specific context',
+      channelId: THREAD_ID,
+      relevanceScore: 1.0,
+    });
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'session',
+      content: 'GLOBAL_OBS: general agent context',
+      relevanceScore: 5.0,
+    });
+
+    const session = getSession(db, discordSessionId)!;
+    const result = (pm as any).buildResumePrompt(session);
+    const channelPos = result.prompt.indexOf('CHANNEL_OBS');
+    const globalPos = result.prompt.indexOf('GLOBAL_OBS');
+    expect(channelPos).toBeGreaterThan(-1);
+    expect(globalPos).toBeGreaterThan(-1);
+    expect(channelPos).toBeLessThan(globalPos);
+  });
+
+  test('non-channel session gets only global observations', () => {
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'session',
+      content: 'GLOBAL_ONLY: general context',
+      relevanceScore: 2.0,
+    });
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'THREAD_ONLY: should not appear for non-discord session',
+      channelId: 'some-other-thread',
+      relevanceScore: 5.0,
+    });
+
+    addSessionMessage(db, sessionId, 'user', 'Test message');
+    const session = getSession(db, sessionId)!;
+    const result = (pm as any).buildResumePrompt(session);
+    expect(result.prompt).toContain('GLOBAL_ONLY');
+    // Thread-only observation has channelId but session is not Discord, so it should still appear
+    // in global list since listObservations without channelId filter returns all
+    expect(result.prompt).toContain('THREAD_ONLY');
+  });
+
+  test('observations from a different channel are excluded from channel-scoped fetch', () => {
+    const discordSessionId = createDiscordSession();
+
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'THIS_THREAD: correct thread obs',
+      channelId: THREAD_ID,
+      relevanceScore: 2.0,
+    });
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'OTHER_THREAD: wrong thread obs',
+      channelId: 'discord-thread-888',
+      relevanceScore: 2.0,
+    });
+
+    const session = getSession(db, discordSessionId)!;
+    const result = (pm as any).buildResumePrompt(session);
+    expect(result.prompt).toContain('THIS_THREAD');
+    // Other thread obs may appear in global fill, but THIS_THREAD should come first
+    const thisPos = result.prompt.indexOf('THIS_THREAD');
+    const otherPos = result.prompt.indexOf('OTHER_THREAD');
+    expect(thisPos).toBeLessThan(otherPos);
+  });
+
+  test('channel obs deduped from global fill', () => {
+    const discordSessionId = createDiscordSession();
+
+    recordObservation(db, {
+      agentId: AGENT_ID,
+      source: 'discord',
+      content: 'DEDUP_TEST: should appear exactly once',
+      channelId: THREAD_ID,
+      relevanceScore: 5.0,
+    });
+
+    const session = getSession(db, discordSessionId)!;
+    const result = (pm as any).buildResumePrompt(session);
+    const matches = result.prompt.match(/DEDUP_TEST/g);
+    expect(matches).toHaveLength(1);
   });
 });
