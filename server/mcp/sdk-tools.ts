@@ -63,6 +63,13 @@ import {
   handleLibraryRead,
   handleLibraryWrite,
 } from './tool-handlers/library';
+import {
+  handleBoostObservation,
+  handleDismissObservation,
+  handleListObservations,
+  handleObservationStats,
+  handleRecordObservation,
+} from './tool-handlers/observations';
 import { handleManageRepoBlocklist } from './tool-handlers/repo-blocklist';
 import { resolveAllowedTools } from './tool-permissions';
 
@@ -154,6 +161,75 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
       },
       async (args) => handlePromoteMemory(ctx, args),
     ),
+    // ── Observations (short-term memory) ─────────────────────────────────
+    tool(
+      'corvid_record_observation',
+      'Record a short-term observation. Observations accumulate relevance over time and ' +
+        'graduate to long-term memory (ARC-69 ASA) when their score reaches 3.0 and they have been accessed at least twice. ' +
+        'Use this for insights, patterns, decisions, or contextual notes worth remembering.',
+      {
+        content: z.string().describe('The observation content'),
+        source: z
+          .enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual'])
+          .optional()
+          .describe('Observation source (default: "manual")'),
+        source_id: z.string().optional().describe('ID linking to the source (e.g. session ID, PR number)'),
+        suggested_key: z
+          .string()
+          .optional()
+          .describe('Suggested memory key if this observation graduates to long-term storage'),
+        relevance_score: z
+          .number()
+          .optional()
+          .describe('Initial relevance score (default 1.0). Higher = more important.'),
+      },
+      async (args) => handleRecordObservation(ctx, args),
+    ),
+    tool(
+      'corvid_list_observations',
+      'List or search short-term observations. Use query for full-text search, ' +
+        'or filter by status and source. Shows relevance scores and graduation status.',
+      {
+        status: z
+          .enum(['active', 'graduated', 'expired', 'dismissed'])
+          .optional()
+          .describe('Filter by observation status'),
+        source: z
+          .enum(['session', 'feedback', 'daily-review', 'health', 'pr-outcome', 'manual'])
+          .optional()
+          .describe('Filter by source'),
+        query: z.string().optional().describe('Full-text search query'),
+        limit: z.number().optional().describe('Maximum observations to return (default 20)'),
+      },
+      async (args) => handleListObservations(ctx, args),
+    ),
+    tool(
+      'corvid_boost_observation',
+      'Increase the relevance score of an observation. Boosting signals that the observation ' +
+        'is useful and moves it closer to graduation to long-term memory.',
+      {
+        id: z.string().describe('Observation ID to boost'),
+        score_boost: z.number().optional().describe('Amount to increase score by (default 1.0)'),
+      },
+      async (args) => handleBoostObservation(ctx, args),
+    ),
+    tool(
+      'corvid_dismiss_observation',
+      'Dismiss an observation, marking it as no longer relevant. ' +
+        'Dismissed observations are excluded from context loading and graduation.',
+      {
+        id: z.string().describe('Observation ID to dismiss'),
+      },
+      async (args) => handleDismissObservation(ctx, args),
+    ),
+    tool(
+      'corvid_observation_stats',
+      'Get statistics about your observations — active, graduated, expired, dismissed counts, ' +
+        'and top candidates ready for graduation to long-term memory.',
+      {},
+      async () => handleObservationStats(ctx),
+    ),
+
     // ── Shared Library (CRVLIB) ──────────────────────────────────────────
     tool(
       'corvid_library_write',

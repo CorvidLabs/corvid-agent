@@ -16,6 +16,14 @@ describe('DEFAULT_ALLOWED_TOOLS', () => {
     expect(DEFAULT_ALLOWED_TOOLS.has('corvid_delete_memory')).toBe(true);
   });
 
+  test('contains observation tools', () => {
+    expect(DEFAULT_ALLOWED_TOOLS.has('corvid_record_observation')).toBe(true);
+    expect(DEFAULT_ALLOWED_TOOLS.has('corvid_list_observations')).toBe(true);
+    expect(DEFAULT_ALLOWED_TOOLS.has('corvid_boost_observation')).toBe(true);
+    expect(DEFAULT_ALLOWED_TOOLS.has('corvid_dismiss_observation')).toBe(true);
+    expect(DEFAULT_ALLOWED_TOOLS.has('corvid_observation_stats')).toBe(true);
+  });
+
   test('contains github tools', () => {
     expect(DEFAULT_ALLOWED_TOOLS.has('corvid_github_list_prs')).toBe(true);
     expect(DEFAULT_ALLOWED_TOOLS.has('corvid_github_create_pr')).toBe(true);
