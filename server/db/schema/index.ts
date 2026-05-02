@@ -67,10 +67,6 @@ type Domain = {
   seedData?: string[];
 };
 
-// ── Schema version (bump when adding new migrations) ────────────────
-
-const SCHEMA_VERSION = 125;
-
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
 /**
@@ -292,10 +288,33 @@ const MIGRATIONS: Record<number, string[]> = {
     `CREATE INDEX IF NOT EXISTS idx_memory_attestations_key ON memory_attestations(memory_key)`,
   ],
   123: [
-    // Council reputation gating: minimum trust level required for council participation
-    `ALTER TABLE councils ADD COLUMN min_trust_level TEXT`,
+    `CREATE TABLE IF NOT EXISTS activity_summaries (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      period       TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      period_end   TEXT NOT NULL,
+      payload      TEXT NOT NULL,
+      hash         TEXT NOT NULL,
+      txid         TEXT,
+      published_at TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_activity_summaries_period ON activity_summaries(period)`,
+    `CREATE INDEX IF NOT EXISTS idx_activity_summaries_hash ON activity_summaries(hash)`,
   ],
+  124: [
+    `ALTER TABLE sessions ADD COLUMN last_context_tokens INTEGER`,
+    `ALTER TABLE sessions ADD COLUMN last_context_window INTEGER`,
+  ],
+  125: [`ALTER TABLE sessions ADD COLUMN cumulative_turns INTEGER DEFAULT 0`],
+  126: [`ALTER TABLE councils ADD COLUMN min_trust_level TEXT`],
 };
+
+// ── Schema version ──────────────────────────────────────────────────
+// Derived from MIGRATIONS keys so runMigrations cannot advance schema_version
+// past what it actually has statements for. File-based migrations beyond this
+// version are handled by migrate.ts:migrateUp.
+const SCHEMA_VERSION = Math.max(...Object.keys(MIGRATIONS).map(Number));
 
 // ── Migration helpers ───────────────────────────────────────────────
 
