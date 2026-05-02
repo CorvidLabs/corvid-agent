@@ -800,6 +800,121 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: v0.65 — On-Chain Attestations, Context Intelligence, and the Trust Layer -->
+      <article class="post post--full" id="v065-trust-layer"
+               data-tags="release,engineering,research" data-date="2026-05-02"
+               data-search="v0.65 v0.64 attestation reputation trust on-chain ARC-69 context compaction capacity-based Discord embed turn count Material Design 3 M3 Angular council gating plugin registry Telegram compact Three.js 3D visualization observation memory work task delegation fledge adoption 328 commits 10627 tests">
+        <div class="post-meta">
+          <time datetime="2026-05-02">2026-05-02</time>
+          <span class="post-tag tag-release">RELEASE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+          <span class="post-tag tag-research">RESEARCH</span>
+        </div>
+        <h2><a href="#v065-trust-layer">v0.65 &mdash; On-Chain Attestations, Context Intelligence, and the Trust Layer</a></h2>
+
+        <p><strong>TL;DR:</strong> 328 commits, 83 features, 147 fixes across v0.64&ndash;v0.65. Agents now publish verifiable on-chain attestations for every piece of work they do. Context management got a brain &mdash; capacity-based compaction replaced blind turn resets. Discord shows real-time context usage and turn counts. The dashboard went 3D. Material Design 3 migration is complete. Council deliberations now gate on agent reputation. And Fledge is now the primary tooling for everything.</p>
+
+        <h3>On-Chain Attestations: Verifiable Agent Work</h3>
+        <p>This is the biggest architectural addition since AlgoChat. Every significant action an agent takes now gets an <strong>on-chain attestation</strong> &mdash; a cryptographically signed, immutable record on Algorand proving what happened, when, and by whom.</p>
+        <ul>
+          <li><strong>Work task attestations</strong> &mdash; when an agent completes a code task (branch, implement, test, PR), the outcome is published on-chain. Anyone can verify that Agent X actually wrote that PR, not just trust the GitHub author field.</li>
+          <li><strong>Memory attestations</strong> &mdash; when agents store long-term memories as ARC-69 ASAs, the creation and mutation events are attested. You can audit an agent&rsquo;s knowledge evolution.</li>
+          <li><strong>Weekly outcome analysis</strong> &mdash; agents publish weekly summaries of their work on-chain, creating a verifiable activity record that feeds into reputation scoring.</li>
+          <li><strong>Daily/weekly activity summaries</strong> &mdash; automated attestations that capture what each agent accomplished, viewable in the new on-chain transparency section of the reputation dashboard.</li>
+        </ul>
+        <p>This matters because trust in autonomous agents can&rsquo;t be hand-wavy. &ldquo;Trust me, the agent did good work&rdquo; doesn&rsquo;t scale. On-chain attestations give you a concrete, auditable trail &mdash; the same way a blockchain gives you a concrete, auditable trail for financial transactions. Every attestation is an ARC-69 ASA on localnet, queryable via the existing AlgoChat infrastructure.</p>
+        <p>The <code>/api/work-tasks/:id/attestation</code> endpoint lets you pull the attestation for any completed work task. The reputation dashboard now includes a full on-chain transparency section showing an agent&rsquo;s attested history.</p>
+
+        <h3>Council Reputation Gating</h3>
+        <p>Councils &mdash; our structured multi-agent deliberation system &mdash; now enforce a <strong>minimum trust level</strong> for participation. Set a <code>minTrustLevel</code> on a council, and agents below that threshold are filtered out before deliberation begins.</p>
+        <p>This closes a real gap: previously, any agent could participate in any council regardless of their track record. Now, high-stakes decisions (architecture reviews, security audits) can require a proven reputation score. Low-trust agents still participate in lower-stakes councils, building their score over time.</p>
+        <p>Work tasks also gained per-task minimum trust levels for delegation &mdash; you can specify that a particular coding task requires an agent with a trust score above a threshold before it gets assigned.</p>
+
+        <h3>Context Intelligence</h3>
+        <p>We replaced the old turn-based context reset with <strong>capacity-based compaction</strong>. Instead of blindly resetting after N turns (which meant losing context mid-thought on complex tasks, or wasting context on trivial ones), the system now monitors actual token usage and compacts when the context window approaches capacity.</p>
+        <p>This sounds like a small change. It isn&rsquo;t. Turn-based resets were the #1 source of agents &ldquo;forgetting&rdquo; what they were doing. Capacity-based compaction means:</p>
+        <ul>
+          <li>Short conversations never get interrupted</li>
+          <li>Long conversations compact gracefully instead of hard-resetting</li>
+          <li>Real token counts from the API (not estimates) drive the decision</li>
+          <li>Context usage is visible in real-time, not a black box</li>
+        </ul>
+
+        <h3>Discord: See What the Agent Sees</h3>
+        <p>Discord embeds now show <strong>real-time context window usage</strong> in the footer &mdash; a percentage with color-coded indicators (green/yellow/orange/red) that updates as the conversation progresses. You can see exactly how much of the agent&rsquo;s context window is consumed, when compaction kicks in, and how much headroom remains.</p>
+        <p>Turn counts are now tracked and persisted across server restarts, displayed as dual counters (session turns / total turns) in the embed footer. It&rsquo;s a small thing that makes a huge difference &mdash; you always know where you are in a conversation.</p>
+        <p>We also shipped <strong>channel-scoped context retention</strong>, so when you @mention the agent in a channel, it remembers the conversation context from that channel across sessions. No more re-explaining what you&rsquo;re working on every time the session cycles.</p>
+        <p>Behind the scenes: ~20 fixes went into making Discord embeds reliable &mdash; persisting turn counts immediately on message, stripping duplicate conversation_history tags, capping channel context to prevent bloat, re-injecting context on mention-reply resume, and emitting context_usage events from SDK sessions. The number of edge cases in Discord session management is genuinely surprising.</p>
+
+        <h3>Material Design 3: Complete</h3>
+        <p>The Angular dashboard finished its <strong>Material Design 3 migration</strong> across Phases 2 and 3 &mdash; 10 PRs, touching every component in the app:</p>
+        <ul>
+          <li><strong>Phase 2:</strong> Navigation, chat-home, session-input, and all high-traffic components migrated to Angular Material with M3 theming. Dark theme with cyan palette and compact density.</li>
+          <li><strong>Phase 3:</strong> Final components (snackbar, menu, tooltip, progress), chip migration for skill tags and tool names, checkbox migration, and complete elimination of <code>::ng-deep</code> overrides in favor of proper theming.</li>
+          <li><strong>Design token audit:</strong> Fixed all hardcoded colors in the dashboard, replacing them with proper CSS custom properties.</li>
+        </ul>
+        <p>The dashboard also gained a <strong>dual-mode view</strong> &mdash; toggle between basic stats and a Three.js 3D agent visualization that renders your agent constellation as an interactive spatial map. It&rsquo;s the kind of thing that sounds gratuitous until you have eight agents and need to see their relationships at a glance.</p>
+
+        <h3>Telegram: /compact and Resilience</h3>
+        <p>The Telegram bridge got a <code>/compact</code> command that lets users manually trigger context compaction from the chat. Session error handling was overhauled, and a subscription leak was fixed that was slowly accumulating resources on long-running instances.</p>
+
+        <h3>Platform Plumbing</h3>
+        <ul>
+          <li><strong>Plugin registry wired into MCP</strong> &mdash; the plugin system now dispatches through the MCP tool pipeline, meaning plugins can provide tools that agents discover and use like any other MCP tool.</li>
+          <li><strong>Process decomposition</strong> &mdash; the 2,388-line <code>manager.ts</code> god object got its first real surgery: approval-flow and persona-injector extracted into standalone modules. More decomposition is planned.</li>
+          <li><strong>Observation tools exposed to agents</strong> &mdash; agents can now record and query short-term observations via MCP, enabling the two-tier memory system (SQLite observations + ARC-69 long-term) to work natively from agent sessions.</li>
+          <li><strong>Per-provider health status</strong> &mdash; <code>/api/health</code> now reports individual provider health (Anthropic, OpenAI, Ollama) instead of a single aggregate, so you can tell which provider is degraded.</li>
+          <li><strong>Work task failure notifications</strong> &mdash; when a work task fails validation after max iterations, the owner gets notified immediately instead of the failure silently disappearing.</li>
+          <li><strong>ARC-69 memory pagination</strong> &mdash; listing on-chain memories now paginates correctly instead of choking on large memory sets.</li>
+          <li><strong>Security:</strong> SDK lockfile updated to 0.92.0+ to fix GHSA-p7fg-763f-g4gf.</li>
+        </ul>
+
+        <h3>Fledge 1.0.0: From Experiment to Primary Tooling</h3>
+        <p><strong>Fledge hit 1.0.0</strong> &mdash; and we went all-in. What started as an internal experiment to unify our scattered build scripts, Makefiles, and CI glue is now a stable, production-grade CLI that every agent and human on the team uses daily. The jump from 0.17.0 to 1.0.0 represents full API stability, backwards compatibility guarantees, and a mature plugin ecosystem.</p>
+
+        <h4>What Changed at 1.0</h4>
+        <ul>
+          <li><strong>Stable command surface:</strong> All commands (<code>fledge run</code>, <code>fledge lanes</code>, <code>fledge work</code>, <code>fledge spec</code>, <code>fledge review</code>, <code>fledge release</code>) are now frozen &mdash; no more breaking changes without a major version bump.</li>
+          <li><strong>Plugin protocol v1:</strong> JSON-over-stdin/stdout with structured capabilities model. Plugins declare what they need, users approve during installation. 11 plugins stable and tested.</li>
+          <li><strong>Template engine matured:</strong> Six built-in templates plus community contributions (Angular, FastAPI, MCP servers, Swift packages, monorepos).</li>
+          <li><strong>Structured output everywhere:</strong> Every command supports <code>--json</code> for machine parsing &mdash; critical for AI agent consumption.</li>
+        </ul>
+
+        <h4>Full Adoption Across corvid-agent</h4>
+        <p>28 files updated across the codebase. <code>CLAUDE.md</code>, <code>AGENTS.md</code>, <code>CONTRIBUTING.md</code>, all spec files, CI configs, and agent verification flows now point to <code>fledge lanes run verify</code> as the single command to validate changes. No more <code>bun run lint &amp;&amp; bun x tsc &amp;&amp; bun test &amp;&amp; bun run spec:check</code> &mdash; one command does it all.</p>
+        <p>New lanes and tasks added for this project:</p>
+        <ul>
+          <li><code>verify</code> lane &mdash; lint, typecheck, test, spec-check (the CI pipeline)</li>
+          <li><code>release-check</code> lane &mdash; full verify + deps audit + changelog validation</li>
+          <li><code>status</code> lane &mdash; quick project health snapshot</li>
+          <li><code>audit</code> lane &mdash; security, license, and dependency sweep</li>
+          <li>Individual tasks: <code>deps-check</code>, <code>review</code>, <code>loc</code>, <code>changelog</code></li>
+        </ul>
+
+        <h4>Why This Matters for Multi-Agent Development</h4>
+        <p>When five AI agents and two humans share a codebase, everyone needs to speak the same language. Fledge is that language. Jackdaw runs <code>fledge lanes run verify</code> before opening a PR. Rook runs <code>fledge review</code> to audit it. Magpie runs <code>fledge doctor</code> to validate environment before starting work. Same tools, same output format, same expectations &mdash; whether the operator is carbon or silicon.</p>
+        <p>The zero-config defaults mean new agents (or new humans) can clone the repo and immediately validate their work without reading a setup guide. That&rsquo;s the real win: <strong>shared workflow as infrastructure</strong>, not documentation that drifts.</p>
+        <p>All 11 plugins tested and passing. 10,627 tests green. <a href="https://github.com/CorvidLabs/fledge" target="_blank">Fledge on GitHub</a>.</p>
+
+        <h3>By the Numbers</h3>
+        <table style="width:100%; border-collapse:collapse; margin:1em 0;">
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Commits (v0.60&rarr;v0.65)</td><td style="padding:8px 12px; font-weight:700;">328</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Features shipped</td><td style="padding:8px 12px; font-weight:700;">83</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Bugs fixed</td><td style="padding:8px 12px; font-weight:700;">147</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Tests passing</td><td style="padding:8px 12px; font-weight:700;">10,627</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">TypeScript files</td><td style="padding:8px 12px; font-weight:700;">8,982</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Lines of TypeScript</td><td style="padding:8px 12px; font-weight:700;">336,051</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">API routes</td><td style="padding:8px 12px; font-weight:700;">56</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Agent skills</td><td style="padding:8px 12px; font-weight:700;">29</td></tr>
+          <tr><td style="padding:8px 12px; color:var(--text-dim);">Current version</td><td style="padding:8px 12px; font-weight:700;">v0.65.0</td></tr>
+        </table>
+
+        <h3>What&rsquo;s Next</h3>
+        <p>The attestation infrastructure is the foundation for the next phase: <strong>cross-instance agent networks</strong>. When agents on different machines can verify each other&rsquo;s work history on-chain, you get decentralized delegation without centralized trust. That&rsquo;s the road to v1.0 &mdash; agents that don&rsquo;t just work autonomously, but work <em>together</em> autonomously, with cryptographic proof of everything they do.</p>
+        <p>Session keep-alive architecture is being planned (#2222) to eliminate the timeout pain points that plague long development cycles. And the manager.ts decomposition continues &mdash; the goal is to get that 2,388-line god object down to clean, focused modules.</p>
+        <p><em>corvid-agent v0.65.0 is available now. <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank">GitHub</a> &mdash; <a href="https://corvidlabs.github.io/corvid-agent/" target="_blank">Docs</a></em></p>
+      </article>
+
       <!-- Post: Fledge — One CLI for Your Whole Dev Lifecycle -->
       <article class="post post--full" id="fledge-introduction"
                data-tags="engineering,release,research" data-date="2026-04-23"
