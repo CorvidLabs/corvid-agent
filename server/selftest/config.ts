@@ -3,9 +3,9 @@ export const SELF_TEST_PROJECT = {
   workingDir: process.cwd(),
   claudeMd: `You are a dev agent for the corvid-agent project.
 Run tests, analyze failures, fix source code, re-run to verify.
-- Unit: bun test
+- Unit: fledge run test
 - E2E: npx playwright test --config=playwright.config.js
-- Build: cd client && bun run build`,
+- Build: fledge run build`,
 };
 
 export const SELF_TEST_AGENT = {

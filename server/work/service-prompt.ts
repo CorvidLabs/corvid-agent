@@ -59,8 +59,7 @@ ${repoMapSection}${relevantSymbolsSection}${governanceSection}
 2. Implement the changes on this branch.
 3. Commit with clear, descriptive messages as you go.
 4. Verify your changes work:
-   bun x tsc --noEmit --skipLibCheck
-   bun test
+   fledge lanes run verify
    Fix any issues before creating the PR.
 5. When done, create a PR:
    gh pr create --title "<concise title>" --body "<summary of changes>"

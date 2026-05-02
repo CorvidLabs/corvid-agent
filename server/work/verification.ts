@@ -148,7 +148,7 @@ ${itemText}
 2. Verify the test plan item described above.
    - For UI/rendering checks: inspect the relevant files, ensure markup/styling is correct.
    - For functionality checks: run relevant tests, check endpoints, verify behavior.
-   - For build checks: run \`bun x tsc --noEmit --skipLibCheck\` and/or \`bun test\`.
+   - For build checks: run \`fledge lanes run verify\`.
 3. If the verification **passes**: output exactly \`VERIFICATION_PASSED\` as the final line.
 4. If the verification **fails**: output exactly \`VERIFICATION_FAILED\` as the final line, with a brief explanation above it.
 

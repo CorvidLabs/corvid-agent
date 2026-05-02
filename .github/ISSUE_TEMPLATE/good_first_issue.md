@@ -25,7 +25,7 @@ assignees: ''
 1. Fork the repo and clone it
 2. Run `bash scripts/dev-setup.sh` to set up your environment
 3. Make the change
-4. Run `bun test` to verify nothing broke
+4. Run `fledge lanes run verify` to verify nothing broke
 5. Open a PR!
 
 ## Estimated effort

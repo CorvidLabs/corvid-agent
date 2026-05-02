@@ -57,7 +57,7 @@ Provides a self-test facility that creates a dedicated project and agent for run
 3. `ensureSetup` is idempotent: it finds existing project/agent by name rather than creating duplicates.
 4. When the self-test agent already exists, `ensureSetup` updates its configuration to match `SELF_TEST_AGENT` (system prompt, model, permission mode, tools, budget).
 5. The session `source` is always `'web'`.
-6. Test type `'unit'` runs `bun test`; `'e2e'` runs `npx playwright test --config=playwright.config.js`; `'all'` runs both sequentially.
+6. Test type `'unit'` runs `fledge run test`; `'e2e'` runs `npx playwright test --config=playwright.config.js`; `'all'` runs both sequentially.
 7. The agent is instructed to analyze failures, fix source code, and re-run to verify fixes.
 
 ## Behavioral Examples

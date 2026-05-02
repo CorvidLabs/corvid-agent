@@ -14,7 +14,7 @@ spec: selftest.spec.md
 - `SelfTestService.ensureSetup` finds or creates a project named `'corvid-agent (self)'` with `workingDir` set to `process.cwd()`; does not create duplicates
 - `SelfTestService.ensureSetup` finds or creates an agent named `'Self-Test Agent'` with model `'claude-sonnet-4-20250514'`, permission mode `'full-auto'`, allowed tools `'Bash,Read,Write,Edit,Glob,Grep'`, max budget `$5.00`, and `algochatEnabled: false`
 - When the self-test agent already exists, `ensureSetup` updates its configuration (system prompt, model, permission mode, tools, budget) to match `SELF_TEST_AGENT` constants
-- `SelfTestService.run('unit')` creates a session with a prompt instructing the agent to run `bun test`, analyze failures, fix source code, and re-run to verify
+- `SelfTestService.run('unit')` creates a session with a prompt instructing the agent to run `fledge run test`, analyze failures, fix source code, and re-run to verify
 - `SelfTestService.run('e2e')` creates a session with a prompt to run `npx playwright test --config=playwright.config.js`
 - `SelfTestService.run('all')` creates a session with a prompt to run unit tests first, then e2e tests, and fix any failures
 - Sessions are created with `source: 'web'` and name format `'Self-Test: {testType}'`

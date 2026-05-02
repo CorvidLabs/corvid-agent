@@ -17,10 +17,10 @@ This is the root-level testing companion for the spec template. Each module's `t
 
 ## Manual Testing
 
-- [ ] Run `bun test` and verify all tests pass
-- [ ] Run `bun run lint` and verify zero lint errors
-- [ ] Run `bun x tsc --noEmit --skipLibCheck` and verify zero type errors
-- [ ] Run `bun run spec:check` and verify all specs pass
+- [ ] Run `fledge run test` and verify all tests pass
+- [ ] Run `fledge run lint` and verify zero lint errors
+- [ ] Run `fledge run typecheck` and verify zero type errors
+- [ ] Run `fledge run spec-check` and verify all specs pass
 
 ## Edge Cases & Boundary Conditions
 

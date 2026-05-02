@@ -158,14 +158,17 @@ Key patterns:
 ### Common Commands
 
 ```bash
+# Full verification pipeline (lint, typecheck, test, spec-check)
+fledge lanes run verify
+
 # Start the server in watch mode (auto-restarts on file changes)
-bun run dev
+fledge run dev
 
 # Run all server unit tests
-bun test
+fledge run test
 
 # Run a specific test file
-bun test server/__tests__/db.test.ts
+fledge run test -- server/__tests__/db.test.ts
 
 # Run E2E tests (requires Playwright: npx playwright install)
 bun run test:e2e
@@ -174,22 +177,25 @@ bun run test:e2e
 bun run test:e2e:ui
 
 # Build the Angular client
-bun run build:client
+fledge run build
 
 # Run Angular client dev server (separate terminal)
-bun run dev:client
+fledge run dev-client
 
 # Run Angular component tests
 cd client && npx vitest run
 
 # Type-check the entire project
-bun x tsc --noEmit --skipLibCheck
+fledge run typecheck
 
 # Validate module specs
-bun run spec:check
+fledge run spec-check
 
 # Check for SQL injection patterns
-bun run lint:sql
+fledge run lint-sql
+
+# Auto-fix lint and formatting
+fledge lanes run fix
 ```
 
 ### Scripts Reference
@@ -229,17 +235,17 @@ Every `bun run <script>` command defined in `package.json`:
 
 ### Development Workflow
 
-1. **Start the server**: `bun run dev` — starts on `http://localhost:3000` with file watching
+1. **Start the server**: `fledge run dev` — starts on `http://localhost:3000` with file watching
 2. **Make changes** — the server restarts automatically on save
 3. **Test your changes** — run the relevant tests (see Testing section)
-4. **Type-check before committing**: `bun x tsc --noEmit --skipLibCheck`
+4. **Verify before committing**: `fledge lanes run verify`
 
 ### Code Patterns
 
 - **Logging**: Use `createLogger('module-name')` from `server/lib/logger.ts` — never `console.log`
 - **Validation**: Use Zod schemas for request/response validation
 - **Error handling**: Always catch and log errors with context
-- **Database queries**: Use parameterized queries only — run `bun run lint:sql` to check
+- **Database queries**: Use parameterized queries only — run `fledge run lint-sql` to check
 - **Route handlers**: Follow existing patterns in `server/routes/`
 - **Types**: Shared types go in `shared/`, server-only types stay in `server/`
 
@@ -248,7 +254,7 @@ Every `bun run <script>` command defined in `package.json`:
 ### Unit Tests (6500+)
 
 ```bash
-bun test                              # Run all tests (~30s)
+fledge run test                       # Run all tests (~30s)
 bun test server/__tests__/db.test.ts  # Run a specific file
 bun test --watch                      # Watch mode
 ```
@@ -275,7 +281,7 @@ cd client && npx vitest               # Watch mode
 ### Module Spec Validation
 
 ```bash
-bun run spec:check                    # Validate 123 module specs in specs/
+fledge run spec-check                 # Validate 123 module specs in specs/
 ```
 
 Checks YAML frontmatter, required sections, API surface coverage, file existence, and dependency graph integrity. All 123 specs should pass before merging.
