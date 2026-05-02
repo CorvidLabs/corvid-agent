@@ -67,10 +67,6 @@ type Domain = {
   seedData?: string[];
 };
 
-// ── Schema version (bump when adding new migrations) ────────────────
-
-const SCHEMA_VERSION = 125;
-
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 
 /**
@@ -296,6 +292,12 @@ const MIGRATIONS: Record<number, string[]> = {
     `ALTER TABLE councils ADD COLUMN min_trust_level TEXT`,
   ],
 };
+
+// ── Schema version ──────────────────────────────────────────────────
+// Derived from MIGRATIONS keys so runMigrations cannot advance schema_version
+// past what it actually has statements for. File-based migrations beyond this
+// version are handled by migrate.ts:migrateUp.
+const SCHEMA_VERSION = Math.max(...Object.keys(MIGRATIONS).map(Number));
 
 // ── Migration helpers ───────────────────────────────────────────────
 
