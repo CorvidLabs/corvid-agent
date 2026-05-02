@@ -196,10 +196,16 @@ function formatTokenCount(tokens: number): string {
 
 /**
  * Build a detailed footer string with full session context.
- * Format: `AgentName · model · project · sid:XXXXXX · status | T:5 | 🟢 32% (64k/200k)`
+ * Format: `AgentName · model · project · sid:XXXXXX · status | T:5(23) | 🟢 32% (64k/200k)`
+ * When cumulativeTurns equals active turns, shows just `T:5`.
  * Segments are omitted when their value is not provided.
  */
-export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage, turns?: number): string {
+export function buildFooterText(
+  ctx: FooterContext,
+  contextUsage?: ContextUsage,
+  turns?: number,
+  cumulativeTurns?: number,
+): string {
   const parts: string[] = [ctx.agentName];
   if (ctx.agentModel) {
     parts.push(ctx.agentModel);
@@ -216,7 +222,11 @@ export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage,
   const base = parts.join(' · ');
   const segments: string[] = [base];
   if (turns && turns > 0) {
-    segments.push(`T:${turns}`);
+    if (cumulativeTurns && cumulativeTurns > turns) {
+      segments.push(`T:${turns}(${cumulativeTurns})`);
+    } else {
+      segments.push(`T:${turns}`);
+    }
   }
   if (contextUsage) {
     segments.push(formatContextUsage(contextUsage));
@@ -226,16 +236,25 @@ export function buildFooterText(ctx: FooterContext, contextUsage?: ContextUsage,
 
 /**
  * Build a footer with session context AND run stats.
- * Format: `AgentName · model · sid:XXXXXX · status | 5 files · 12 turns · 38 tools | 🟢 32% (64k/200k)`
+ * Format: `AgentName · model · sid:XXXXXX · status | 5 files · 12 turns (23 total) · 38 tools | 🟢 32% (64k/200k)`
  */
-export function buildFooterWithStats(ctx: FooterContext, stats: FooterStats, contextUsage?: ContextUsage): string {
+export function buildFooterWithStats(
+  ctx: FooterContext,
+  stats: FooterStats,
+  contextUsage?: ContextUsage,
+  cumulativeTurns?: number,
+): string {
   const base = buildFooterText(ctx);
   const statParts: string[] = [];
   if (stats.filesChanged && stats.filesChanged > 0) {
     statParts.push(`${stats.filesChanged} files`);
   }
   if (stats.turns && stats.turns > 0) {
-    statParts.push(`${stats.turns} turns`);
+    if (cumulativeTurns && cumulativeTurns > stats.turns) {
+      statParts.push(`${stats.turns} turns (${cumulativeTurns} total)`);
+    } else {
+      statParts.push(`${stats.turns} turns`);
+    }
   }
   if (stats.tools && stats.tools > 0) {
     statParts.push(`${stats.tools} tools`);

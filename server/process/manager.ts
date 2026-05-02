@@ -15,6 +15,7 @@ import {
   getParticipantForSession,
   getSession,
   getSessionMessages,
+  incrementSessionCumulativeTurns,
   updateSessionContextTokens,
   updateSessionCost,
   updateSessionPid,
@@ -1560,6 +1561,7 @@ export class ProcessManager {
       meta.turnCount++;
       updateSessionTurns(this.db, sessionId, meta.turnCount);
     }
+    incrementSessionCumulativeTurns(this.db, sessionId);
 
     return true;
   }

@@ -5,6 +5,7 @@ status: active
 files:
   - server/db/sessions.ts
   - server/db/migrations/115_algochat_unique_participant.ts
+  - server/db/migrations/125_cumulative_turns.ts
 db_tables:
   - sessions
   - session_messages
@@ -37,6 +38,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionCost` | `(db: Database, id: string, costUsd: number, turns: number)` | `void` | Update cumulative cost and turn count |
 | `getSessionTurns` | `(db: Database, id: string)` | `number` | Lightweight read of `total_turns` for a session (returns 0 if not found) |
 | `updateSessionTurns` | `(db: Database, id: string, turns: number)` | `void` | Update turn count independently of cost (for immediate persistence on user message) |
+| `getSessionCumulativeTurns` | `(db: Database, id: string)` | `number` | Read `cumulative_turns` for a session (returns 0 if not found). Unlike `total_turns`, this never resets on context compaction |
+| `incrementSessionCumulativeTurns` | `(db: Database, id: string)` | `void` | Atomically increment `cumulative_turns` by 1 using COALESCE for NULL safety |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
 | `updateSessionContextTokens` | `(db: Database, id: string, tokens: number, contextWindow: number)` | `void` | Persist real context token count and window size from API |
 | `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for cross-session context carry-over |
@@ -62,6 +65,13 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Removes duplicate conversations (keeps latest per `participant_addr`), replaces index with UNIQUE constraint |
 | `down` | `(db: Database)` | `void` | Reverts UNIQUE index back to a non-unique index |
+
+### Exported Migration Functions — `server/db/migrations/125_cumulative_turns.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `cumulative_turns` column to sessions table (guarded by PRAGMA table_info), backfills from `total_turns` |
+| `down` | `(_db: Database)` | `void` | No-op (column addition is not reversed) |
 
 ## Invariants
 
@@ -123,12 +133,12 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession` |
+| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `incrementSessionCumulativeTurns`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession` |
 | `server/work/service.ts` | `createSession` |
 | `server/scheduler/service.ts` | `createSession` |
 | `server/routes/sessions.ts` | All session CRUD functions |
 | `server/algochat/bridge.ts` | Conversation CRUD functions |
-| `server/discord/thread-response/embed-response.ts` | `getSessionTurns` |
+| `server/discord/thread-response/embed-response.ts` | `getSessionTurns`, `getSessionCumulativeTurns` |
 
 ## Database Tables
 
@@ -146,7 +156,8 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | pid | INTEGER | nullable | OS process ID when running |
 | total_cost_usd | REAL | DEFAULT 0 | Cumulative API cost |
 | total_algo_spent | REAL | DEFAULT 0 | Cumulative microALGOs spent |
-| total_turns | INTEGER | DEFAULT 0 | Number of conversation turns |
+| total_turns | INTEGER | DEFAULT 0 | Number of conversation turns (resets on context compaction) |
+| cumulative_turns | INTEGER | DEFAULT 0 | Total turns across all context windows (never resets) |
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
 | council_role | TEXT | nullable | chairman/member/synthesizer |
 | work_dir | TEXT | nullable | Override working directory (e.g. git worktree) |
@@ -189,3 +200,4 @@ No environment variables. This module is a pure data layer.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
+| 2026-05-01 | corvid-agent | Add cumulative_turns column, getSessionCumulativeTurns, incrementSessionCumulativeTurns (#2216) |
