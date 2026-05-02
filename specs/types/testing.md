@@ -8,13 +8,13 @@ spec: types.spec.md
 |-----------|------|----------------|
 | _(none)_ | — | This module is a pure `.d.ts` stub; there is no runtime code to test. Correctness is verified by TypeScript compilation only. |
 
-Type correctness is verified by running `bun x tsc --noEmit --skipLibCheck` across the server codebase. If the ambient declarations diverge from the actual package API, imports in `server/algochat/` will produce compile-time errors.
+Type correctness is verified by running `fledge run typecheck` across the server codebase. If the ambient declarations diverge from the actual package API, imports in `server/algochat/` will produce compile-time errors.
 
 ## Manual Testing
 
-- [ ] Remove `@corvidlabs/ts-algochat` from `node_modules` (or in CI without the package) and run `bun x tsc --noEmit --skipLibCheck` — verify compilation succeeds using these ambient declarations
-- [ ] Install the real `@corvidlabs/ts-algochat` package and re-run `tsc` — verify TypeScript prefers the real package over the stubs with no errors
-- [ ] Add a new function to the real package that is missing from the stubs — verify `tsc` emits a type error at call sites, confirming stubs are checked
+- [ ] Remove `@corvidlabs/ts-algochat` from `node_modules` (or in CI without the package) and run `fledge run typecheck` — verify compilation succeeds using these ambient declarations
+- [ ] Install the real `@corvidlabs/ts-algochat` package and re-run `fledge run typecheck` — verify TypeScript prefers the real package over the stubs with no errors
+- [ ] Add a new function to the real package that is missing from the stubs — verify `fledge run typecheck` emits a type error at call sites, confirming stubs are checked
 
 ## Edge Cases & Boundary Conditions
 

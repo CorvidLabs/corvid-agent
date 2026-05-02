@@ -150,10 +150,10 @@ info "Dependencies installed"
 
 step "Building Angular client"
 
-if bun run build:client; then
+if fledge run build; then
     info "Client built successfully"
 else
-    warn "Client build failed — you can retry with: bun run build:client"
+    warn "Client build failed — you can retry with: fledge run build"
     warn "The server will still run but the dashboard UI won't be available."
 fi
 

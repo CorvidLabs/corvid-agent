@@ -10,7 +10,7 @@ spec: ast.spec.md
 
 ## Manual Testing
 
-- [ ] Run `bun test server/__tests__/ast-service.test.ts` to confirm all AST unit tests pass
+- [ ] Run `fledge run test -- server/__tests__/ast-service.test.ts` to confirm all AST unit tests pass
 - [ ] In a running session, invoke the `corvid_code_symbols` MCP tool on this repo's `server/` directory and confirm TypeScript function/class symbols are returned
 - [ ] Modify a source file and re-index the project; confirm the modified file's symbols update while unchanged files are skipped (check logs for "skipping unchanged" messages)
 - [ ] Point `parseFile` at a file larger than 512KB; confirm it returns null without error

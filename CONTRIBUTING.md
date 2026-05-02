@@ -168,7 +168,7 @@ fledge run dev
 fledge run test
 
 # Run a specific test file
-bun test server/__tests__/db.test.ts
+fledge run test -- server/__tests__/db.test.ts
 
 # Run E2E tests (requires Playwright: npx playwright install)
 bun run test:e2e

@@ -314,17 +314,17 @@ cat specs/providers/ollama-provider.spec.md
 **Demo flow:**
 ```bash
 # Full suite
-bun test
-# → 5427 pass, 0 fail
+fledge run test
+# → 10,000+ pass, 0 fail
 
 # TypeScript strict
-bunx tsc --noEmit --skipLibCheck
+fledge run typecheck
 
 # Spec validation
-bun run spec:check
-# → 111 specs checked: 111 passed
+fledge run spec-check
+# → 100% file coverage
 
-# All three must pass before any commit
+# All three must pass before any commit (or just: fledge lanes run verify)
 ```
 
 ---
@@ -333,10 +333,11 @@ bun run spec:check
 
 | Command | Purpose |
 |---------|---------|
-| `bun run dev` | Start server |
-| `bun test` | Run all tests |
-| `bunx tsc --noEmit --skipLibCheck` | Type check |
-| `bun run spec:check` | Validate specs |
-| `bun run build:client` | Build Angular dashboard |
+| `fledge run dev` | Start server |
+| `fledge run test` | Run all tests |
+| `fledge run typecheck` | Type check |
+| `fledge run spec-check` | Validate specs |
+| `fledge run build` | Build Angular dashboard |
+| `fledge lanes run verify` | Full verification pipeline |
 | `corvid-agent` | Launch CLI REPL |
 | `corvid-agent chat "..."` | One-shot CLI chat |
