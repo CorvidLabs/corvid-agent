@@ -6,10 +6,13 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CodebaseHealthCollector } from '../improvement/health-collector';
 
-const TMP_DIR = join(import.meta.dir, '../../.tmp-health-test');
+// Use system temp dir (not inside the repo) so tsc/bun-test don't walk up
+// to the project's tsconfig.json / bunfig.toml and scan the whole codebase.
+const TMP_DIR = join(tmpdir(), `corvid-health-test-${process.pid}`);
 
 beforeAll(() => {
   // Create minimal directory structure matching what the collector expects
