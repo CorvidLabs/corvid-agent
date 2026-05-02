@@ -99,7 +99,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleCurrentProject` | `(ctx)` | `Promise<CallToolResult>` | Show the current agent's default project |
 | `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. If both are omitted and `ctx.sessionId` is set, uses that session's `projectId` before falling back to the agent's `defaultProjectId` in `WorkTaskService`. `agent_id` delegates execution and attribution to a specific agent |
 | `handleCheckWorkStatus` | `(ctx, { task_id })` | `Promise<CallToolResult>` | Check the status of a work task by ID |
-| `handleEscalateWorkTask` | `(ctx, { task_id, action })` | `Promise<CallToolResult>` | Escalation handler: retry, retry with Opus, or cancel a stuck/escalated work task |
+| `handleEscalateWorkTask` | `(ctx, { task_id, action: 'retry' \| 'retry_opus' \| 'cancel' })` | `Promise<CallToolResult>` | Escalate a stuck work task: retry with same model, retry with Opus, or cancel |
 | `handleListWorkTasks` | `(ctx, { status?, limit? })` | `Promise<CallToolResult>` | List work tasks for the calling agent, optionally filtered by status |
 | `handleWebSearch` | `(ctx, { query, count? })` | `Promise<CallToolResult>` | Web search via Brave API |
 | `handleDeepResearch` | `(ctx, { query, queries? })` | `Promise<CallToolResult>` | Multi-query deep research via Brave |
