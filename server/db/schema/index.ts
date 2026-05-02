@@ -69,7 +69,7 @@ type Domain = {
 
 // ── Schema version (bump when adding new migrations) ────────────────
 
-const SCHEMA_VERSION = 124;
+const SCHEMA_VERSION = 125;
 
 // ── Build MIGRATIONS dict ───────────────────────────────────────────
 

@@ -221,6 +221,19 @@ export function updateSessionTurns(db: Database, id: string, turns: number): voi
   db.query("UPDATE sessions SET total_turns = ?, updated_at = datetime('now') WHERE id = ?").run(turns, id);
 }
 
+export function getSessionCumulativeTurns(db: Database, id: string): number {
+  const row = db.query('SELECT cumulative_turns FROM sessions WHERE id = ?').get(id) as {
+    cumulative_turns: number;
+  } | null;
+  return row?.cumulative_turns ?? 0;
+}
+
+export function incrementSessionCumulativeTurns(db: Database, id: string): void {
+  db.query(
+    "UPDATE sessions SET cumulative_turns = COALESCE(cumulative_turns, 0) + 1, updated_at = datetime('now') WHERE id = ?",
+  ).run(id);
+}
+
 export function updateSessionContextTokens(db: Database, id: string, tokens: number, contextWindow: number): void {
   db.query(
     "UPDATE sessions SET last_context_tokens = ?, last_context_window = ?, updated_at = datetime('now') WHERE id = ?",
