@@ -99,6 +99,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleCurrentProject` | `(ctx)` | `Promise<CallToolResult>` | Show the current agent's default project |
 | `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. If both are omitted and `ctx.sessionId` is set, uses that session's `projectId` before falling back to the agent's `defaultProjectId` in `WorkTaskService`. `agent_id` delegates execution and attribution to a specific agent |
 | `handleCheckWorkStatus` | `(ctx, { task_id })` | `Promise<CallToolResult>` | Check the status of a work task by ID |
+| `handleEscalateWorkTask` | `(ctx, { task_id, action })` | `Promise<CallToolResult>` | Escalation handler: retry, retry with Opus, or cancel a stuck/escalated work task |
 | `handleListWorkTasks` | `(ctx, { status?, limit? })` | `Promise<CallToolResult>` | List work tasks for the calling agent, optionally filtered by status |
 | `handleWebSearch` | `(ctx, { query, count? })` | `Promise<CallToolResult>` | Web search via Brave API |
 | `handleDeepResearch` | `(ctx, { query, queries? })` | `Promise<CallToolResult>` | Multi-query deep research via Brave |
@@ -259,3 +260,4 @@ Internal constants (not env-configurable):
 | 2026-03-27 | corvid-agent | Added agent identity signature to GitHub write operations (#1555) |
 | 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |
 | 2026-04-13 | corvid-agent | Added cross-channel-guard.ts: runtime enforcement for TODO(#1067), advisory logging for channel-bound sessions |
+| 2026-05-01 | corvid-agent | Documented handleEscalateWorkTask export from work.ts (#2215) |
