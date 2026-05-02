@@ -65,7 +65,7 @@ export class SelfTestService {
     switch (testType) {
       case 'unit':
         prompt =
-          'Run the unit tests with `bun test`. If any tests fail, analyze the failures, fix the source code, and re-run to verify the fix.';
+          'Run the unit tests with `fledge run test`. If any tests fail, analyze the failures, fix the source code, and re-run to verify the fix.';
         break;
       case 'e2e':
         prompt =
@@ -73,7 +73,7 @@ export class SelfTestService {
         break;
       case 'all':
         prompt =
-          'Run all tests. Start with unit tests (`bun test`), then run e2e tests (`npx playwright test --config=playwright.config.js`). If any tests fail, analyze the failures, fix the source code, and re-run to verify all fixes.';
+          'Run all tests. Start with unit tests (`fledge run test`), then run e2e tests (`npx playwright test --config=playwright.config.js`). If any tests fail, analyze the failures, fix the source code, and re-run to verify all fixes.';
         break;
     }
 

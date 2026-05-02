@@ -16,7 +16,7 @@ describe('SELF_TEST_PROJECT config', () => {
   });
 
   test('claudeMd includes test commands', () => {
-    expect(SELF_TEST_PROJECT.claudeMd).toContain('bun test');
+    expect(SELF_TEST_PROJECT.claudeMd).toContain('fledge run test');
     expect(SELF_TEST_PROJECT.claudeMd).toContain('playwright');
   });
 });

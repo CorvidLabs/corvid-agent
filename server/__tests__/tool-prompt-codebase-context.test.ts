@@ -48,9 +48,9 @@ describe('getCodebaseContextPrompt', () => {
 
   test('includes common tasks', () => {
     const result = getCodebaseContextPrompt();
-    expect(result).toContain('bun x tsc');
-    expect(result).toContain('bun test');
-    expect(result).toContain('bun run spec:check');
+    expect(result).toContain('fledge run typecheck');
+    expect(result).toContain('fledge run test');
+    expect(result).toContain('fledge run spec-check');
   });
 
   test('specifies correct GitHub owner', () => {
@@ -83,7 +83,7 @@ describe('getToolInstructionPrompt worked examples', () => {
     const result = getToolInstructionPrompt('llama', ['run_command']);
     expect(result).toContain('Worked Example');
     expect(result).toContain('run_command');
-    expect(result).toContain('bun x tsc');
+    expect(result).toContain('fledge run typecheck');
   });
 
   test('includes fallback worked example with no tools', () => {

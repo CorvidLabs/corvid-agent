@@ -221,10 +221,16 @@ The server exposes a REST API and WebSocket endpoint. The client connects to the
 Run before committing:
 
 ```bash
-bun run lint                          # Biome lint
-bun x tsc --noEmit --skipLibCheck    # TypeScript type check
-bun test                              # Test suite
-bun run spec:check                    # Spec invariant verification
+fledge lanes run verify               # Full pipeline: lint, typecheck, test, spec-check
+```
+
+Individual tasks:
+
+```bash
+fledge run lint                       # Biome lint
+fledge run typecheck                  # TypeScript type check
+fledge run test                       # Test suite
+fledge run spec-check                 # Spec invariant verification
 ```
 
 See [skills/verification/SKILL.md](skills/verification/SKILL.md) for details.

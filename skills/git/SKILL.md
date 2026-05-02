@@ -34,12 +34,10 @@ When running in an isolated worktree or chat session:
 Before every commit, run the verification pipeline:
 
 ```bash
-bun x tsc --noEmit --skipLibCheck
-bun test
-bun run spec:check
+fledge lanes run verify
 ```
 
-All three must pass before committing.
+All checks must pass before committing.
 
 ### Commit Message Style
 

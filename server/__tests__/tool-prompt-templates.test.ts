@@ -32,7 +32,7 @@ describe('getCodebaseContextPrompt', () => {
     expect(result).toContain('server/');
     expect(result).toContain('client/');
     expect(result).toContain('Bun');
-    expect(result).toContain('bun x tsc');
+    expect(result).toContain('fledge run typecheck');
   });
 });
 
@@ -59,7 +59,7 @@ describe('getToolInstructionPrompt', () => {
     const result = getToolInstructionPrompt('llama', ['run_command']);
     expect(result).toContain('Worked Example');
     expect(result).toContain('run_command');
-    expect(result).toContain('tsc');
+    expect(result).toContain('fledge run typecheck');
   });
 
   test('includes fallback worked example when no coding tools', () => {

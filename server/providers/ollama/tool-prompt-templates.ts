@@ -239,15 +239,16 @@ This is a multi-agent AI platform built with TypeScript and Bun.
 - \`specs/\` — Project specifications
 
 ### Key Technologies
-- **Runtime**: Bun (not Node.js) — use \`bun\` for all commands, e.g. \`bun x tsc\`, \`bun test\`
+- **Runtime**: Bun (not Node.js) — use \`fledge\` for all tasks, e.g. \`fledge run typecheck\`, \`fledge run test\`
 - **Language**: TypeScript throughout
 - **Database**: SQLite via better-sqlite3${ownerLine}
 
 ### Common Tasks
-- Type checking: \`bun x tsc --noEmit\`
-- Run tests: \`bun test\`
-- Spec check: \`bun run spec:check\`
-- Start server: \`bun run dev\``;
+- Full verify: \`fledge lanes run verify\`
+- Type checking: \`fledge run typecheck\`
+- Run tests: \`fledge run test\`
+- Spec check: \`fledge run spec-check\`
+- Start server: \`fledge run dev\``;
 }
 
 /**
@@ -377,7 +378,7 @@ Notice: NO narration between steps. NO "Let me read the file" or "I'll check thi
   if (hasRunCommand) {
     return `**Task**: "Check if there are any TypeScript errors"
 
-**Step 1** — You call: run_command with command "bun x tsc --noEmit"
+**Step 1** — You call: run_command with command "fledge run typecheck"
 **Result** — You receive compiler output showing 2 errors in server/routes/api.ts
 **Step 2** — You respond with plain text: "There are 2 TypeScript errors in server/routes/api.ts: [describe errors]"
 

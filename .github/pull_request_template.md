@@ -14,6 +14,6 @@
 - [ ]
 
 ## Checklist
-- [ ] `bun test` passes
+- [ ] `fledge lanes run verify` passes
 - [ ] No secrets committed
 - [ ] Structured logging used (no `console.log`)

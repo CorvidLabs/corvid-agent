@@ -13,10 +13,10 @@ How to write and run tests in the corvid-agent project.
 ## Running Tests
 
 ```bash
-# Run all tests
-bun test
+# Run all tests via fledge
+fledge run test
 
-# Run specific test file
+# Run specific test file (pass through to bun)
 bun test server/db/schema.test.ts
 
 # Run tests matching a pattern
@@ -72,12 +72,10 @@ expect(fn).toThrow('message');       // specific error
 
 ## Validation Pipeline
 
-Before committing, all three must pass:
+Before committing, run the full verification lane:
 
 ```bash
-bun x tsc --noEmit --skipLibCheck    # Type checking
-bun test                              # Unit/integration tests
-bun run spec:check                    # Spec invariant verification
+fledge lanes run verify               # lint → typecheck → test → spec-check
 ```
 
 Work tasks auto-run this pipeline and iterate up to 3 times on failure.

@@ -292,8 +292,7 @@ ${validationOutput}
 2. Fix the TypeScript and/or test failures on this branch.
 3. Commit your fixes with clear messages.
 4. Verify your changes work:
-   bun x tsc --noEmit --skipLibCheck
-   bun test
+   fledge lanes run verify
    Fix any remaining issues.
 5. If a PR already exists, push your fixes. If not, create one:
    gh pr create --title "<concise title>" --body "<summary of changes>"

@@ -65,10 +65,16 @@ Specs in `specs/` are the source of truth. Read the relevant spec before modifyi
 Always run before committing — see [verification skill](skills/verification/SKILL.md) for details:
 
 ```bash
-bun run lint                          # Biome lint check
-bun x tsc --noEmit --skipLibCheck     # TypeScript type checking
-bun test                              # Test suite
-bun run spec:check                    # Spec invariant verification
+fledge lanes run verify               # Full pipeline: lint, typecheck, test, spec-check
+```
+
+Individual tasks (for targeted checks):
+
+```bash
+fledge run lint                       # Biome lint check
+fledge run typecheck                  # TypeScript type checking
+fledge run test                       # Test suite
+fledge run spec-check                 # Spec invariant verification
 ```
 
 ## Coding Conventions
@@ -132,21 +138,20 @@ This project uses [spec-sync](https://github.com/CorvidLabs/spec-sync) for bidir
 
 1. Read the relevant spec in `specs/<module>/<module>.spec.md`
 2. Check companion files: `specs/<module>/tasks.md` and `specs/<module>/context.md`
-3. After changes, run `specsync check` to verify specs still pass
+3. After changes, run `fledge run spec-check` to verify specs still pass
 
 ## Before creating a PR
 
-Run `specsync check --strict` — all specs must pass with zero warnings.
+Run `fledge run spec-check` — all specs must pass.
 
 ## When adding new modules
 
-Run `specsync add-spec <module-name>` to scaffold the spec and companion files, then fill in the spec before writing code.
+Run `bun run spec:add <module-name>` to scaffold the spec and companion files, then fill in the spec before writing code.
 
 ## Key commands
 
-- `specsync check` — validate all specs against source code
-- `specsync check --json` — machine-readable validation output
-- `specsync coverage` — show which modules lack specs
-- `specsync score` — quality score for each spec (0-100)
-- `specsync add-spec <name>` — scaffold a new spec with companion files
-- `specsync resolve --remote` — verify cross-project dependencies
+- `fledge run spec-check` — validate all specs against source code
+- `bun run spec:check -- --json` — machine-readable validation output
+- `bun run spec:coverage` — show which modules lack specs
+- `bun run spec:score` — quality score for each spec (0-100)
+- `bun run spec:add <name>` — scaffold a new spec with companion files
