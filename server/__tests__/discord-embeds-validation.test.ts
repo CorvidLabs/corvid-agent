@@ -96,6 +96,21 @@ describe('buildFooterText', () => {
     });
     expect(result).toBe('Corvid · done');
   });
+
+  test('shows T:x(n) when cumulative turns exceed active turns', () => {
+    const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5, 23);
+    expect(result).toBe('Corvid · opus | T:5(23)');
+  });
+
+  test('shows T:x when cumulative equals active turns', () => {
+    const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5, 5);
+    expect(result).toBe('Corvid · opus | T:5');
+  });
+
+  test('shows T:x when no cumulative turns provided', () => {
+    const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5);
+    expect(result).toBe('Corvid · opus | T:5');
+  });
 });
 
 describe('buildFooterWithStats', () => {
@@ -126,6 +141,21 @@ describe('buildFooterWithStats', () => {
   test('includes tools stat', () => {
     const result = buildFooterWithStats({ agentName: 'Corvid', status: 'done' }, { turns: 3, tools: 15 });
     expect(result).toBe('Corvid · done | 3 turns · 15 tools');
+  });
+
+  test('shows cumulative turns in stats when greater', () => {
+    const result = buildFooterWithStats(
+      { agentName: 'Corvid', status: 'done' },
+      { turns: 5, tools: 10 },
+      undefined,
+      23,
+    );
+    expect(result).toBe('Corvid · done | 5 turns (23 total) · 10 tools');
+  });
+
+  test('omits cumulative when equal to active', () => {
+    const result = buildFooterWithStats({ agentName: 'Corvid', status: 'done' }, { turns: 5, tools: 10 }, undefined, 5);
+    expect(result).toBe('Corvid · done | 5 turns · 10 tools');
   });
 });
 
