@@ -1292,6 +1292,7 @@ export class ProcessManager {
       },
     } as ClaudeStreamEvent);
 
+    this.finalizeTokenTracking(sessionId);
     cp.kill();
     this.processes.delete(sessionId);
     updateSessionPid(this.db, sessionId, null);
@@ -1304,8 +1305,20 @@ export class ProcessManager {
     updateSessionTurns(this.db, session.id, totalTurns);
     const existingMeta = this.sessionMeta.get(session.id);
     if (existingMeta) existingMeta.turnCount = totalTurns;
-    session.lastContextTokens = estimateTokens(resumePrompt);
-    session.lastContextWindow = getContextBudget(agentModel);
+    const tokens = estimateTokens(resumePrompt);
+    const contextWindow = getContextBudget(agentModel);
+    session.lastContextTokens = tokens;
+    session.lastContextWindow = contextWindow;
+    updateSessionContextTokens(this.db, session.id, tokens, contextWindow);
+    const usagePercent = contextWindow > 0 ? Math.round((tokens / contextWindow) * 100) : 0;
+    if (existingMeta) existingMeta.lastContextUsagePercent = usagePercent;
+    this.eventBus.emit(session.id, {
+      type: 'context_usage',
+      session_id: session.id,
+      estimatedTokens: tokens,
+      contextWindow,
+      usagePercent,
+    } as ClaudeStreamEvent);
   }
 
   private buildResumePrompt(session: Session, newPrompt?: string): { prompt: string; activeTurns: number } {
@@ -1447,6 +1460,28 @@ export class ProcessManager {
   }
 
   /**
+   * Ensure the DB has a non-NULL token count for this session.
+   * Called before meta deletion so we never lose the last known context usage.
+   */
+  private finalizeTokenTracking(sessionId: string): void {
+    const meta = this.sessionMeta.get(sessionId);
+    if (!meta?.lastContextUsagePercent) return;
+
+    const session = getSession(this.db, sessionId);
+    if (!session || (session.lastContextTokens != null && session.lastContextTokens > 0)) return;
+
+    const fallback = this.computeFallbackContextUsage(sessionId);
+    if (fallback) {
+      updateSessionContextTokens(this.db, sessionId, fallback.estimatedTokens, fallback.contextWindow);
+      log.debug('Finalized token tracking on cleanup', {
+        sessionId: sessionId.slice(0, 8),
+        estimatedTokens: fallback.estimatedTokens,
+        usagePercent: fallback.usagePercent,
+      });
+    }
+  }
+
+  /**
    * Remove all in-memory state for a session. Idempotent -- safe to call
    * multiple times or for sessions that have already been partially cleaned.
    *
@@ -1456,12 +1491,13 @@ export class ProcessManager {
   cleanupSessionState(sessionId: string): void {
     this.startingSession.delete(sessionId);
     this.processes.delete(sessionId);
-    this.sessionMeta.delete(sessionId);
     this.eventBus.removeSessionSubscribers(sessionId);
+    this.finalizeTokenTracking(sessionId);
     this.resilienceManager.deletePausedSession(sessionId);
     this.timerManager.cleanupSession(sessionId);
     this.approvalManager.cancelSession(sessionId);
     this.ownerQuestionManager.cancelSession(sessionId);
+    this.sessionMeta.delete(sessionId);
   }
 
   /**
@@ -1960,6 +1996,7 @@ export class ProcessManager {
     if (code !== 0 && meta?.source === 'algochat') {
       this.processes.delete(sessionId);
       this.eventBus.removeSessionSubscribers(sessionId);
+      this.finalizeTokenTracking(sessionId);
       this.resilienceManager.deletePausedSession(sessionId);
       this.timerManager.cleanupSession(sessionId);
       this.approvalManager.cancelSession(sessionId);
