@@ -12,12 +12,19 @@ export interface WorkTask {
     description: string;
     branchName: string | null;
     status: WorkTaskStatus;
+    priority: number;
     prUrl: string | null;
     summary: string | null;
     error: string | null;
     originalBranch: string | null;
     worktreeDir: string | null;
     iterationCount: number;
+    maxRetries: number;
+    retryCount: number;
+    retryBackoff: 'fixed' | 'linear' | 'exponential';
+    lastRetryAt: string | null;
+    preemptedBy: string | null;
+    queuedAt: string | null;
     createdAt: string;
     completedAt: string | null;
 }

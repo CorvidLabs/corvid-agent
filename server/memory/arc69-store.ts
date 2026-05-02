@@ -289,37 +289,54 @@ export async function readMemoryAsa(ctx: Arc69Context, asaId: number): Promise<A
 /**
  * List all memory ASAs created by this agent on localnet.
  * Queries the indexer for ASAs created by the agent's wallet address
- * with unit name 'CRVMEM'.
+ * with unit name 'CRVMEM'. Paginates through all results and reads
+ * ASAs concurrently for performance.
  */
 export async function listMemoryAsas(ctx: Arc69Context): Promise<Arc69Memory[]> {
   const memories: Arc69Memory[] = [];
 
   try {
-    // Query all assets created by this agent
-    const response = await ctx.indexerClient.lookupAccountCreatedAssets(ctx.chatAccount.address).do();
+    // Collect all CRVMEM asset IDs across all pages
+    const asaIds: number[] = [];
+    let nextToken: string | undefined;
 
-    const assets = (response.assets ?? []) as unknown as Array<Record<string, unknown>>;
+    do {
+      let query = ctx.indexerClient.lookupAccountCreatedAssets(ctx.chatAccount.address).limit(100);
+      if (nextToken) query = query.nextToken(nextToken);
+      const response = await query.do();
 
-    for (const asset of assets) {
-      const params = (asset.params ?? asset) as Record<string, unknown>;
-      // Filter by unit name
-      const unitName = (params['unit-name'] ?? params.unitName) as string | undefined;
-      if (unitName !== 'CRVMEM') continue;
+      const assets = (response.assets ?? []) as unknown as Array<Record<string, unknown>>;
+      for (const asset of assets) {
+        const params = (asset.params ?? asset) as Record<string, unknown>;
+        const unitName = (params['unit-name'] ?? params.unitName) as string | undefined;
+        if (unitName !== 'CRVMEM') continue;
 
-      const asaId = (asset.index ?? asset['asset-id']) as number | undefined;
-      if (!asaId) continue;
+        const asaId = (asset.index ?? asset['asset-id']) as number | undefined;
+        if (!asaId) continue;
 
-      // If the asset is deleted/destroyed, skip it
-      if (asset.deleted) continue;
+        if (asset.deleted) continue;
 
-      const memory = await readMemoryAsa(ctx, Number(asaId));
-      if (memory) {
-        memories.push(memory);
+        asaIds.push(Number(asaId));
+      }
+
+      nextToken = response.nextToken as string | undefined;
+    } while (nextToken);
+
+    log.debug('Found CRVMEM ASAs', { count: asaIds.length, agentId: ctx.agentId });
+
+    // Read ASAs concurrently in batches of 10
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < asaIds.length; i += BATCH_SIZE) {
+      const batch = asaIds.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(batch.map((id) => readMemoryAsa(ctx, id)));
+      for (const memory of results) {
+        if (memory) memories.push(memory);
       }
     }
   } catch (err) {
-    log.debug('Failed to list memory ASAs', {
+    log.warn('Failed to list memory ASAs', {
       error: err instanceof Error ? err.message : String(err),
+      agentId: ctx.agentId,
     });
   }
 

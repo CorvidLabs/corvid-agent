@@ -26,10 +26,16 @@ const log = createLogger('McpToolHandlers');
 async function buildArc69Context(ctx: McpToolContext): Promise<Arc69Context | null> {
   try {
     const service = ctx.agentWalletService.getAlgoChatService();
-    if (!service.indexerClient) return null;
+    if (!service.indexerClient) {
+      log.warn('ARC-69 context unavailable: no indexer client', { agentId: ctx.agentId });
+      return null;
+    }
 
     const chatAccountResult = await ctx.agentWalletService.getAgentChatAccount(ctx.agentId);
-    if (!chatAccountResult) return null;
+    if (!chatAccountResult) {
+      log.warn('ARC-69 context unavailable: no chat account for agent', { agentId: ctx.agentId });
+      return null;
+    }
 
     return {
       db: ctx.db,
@@ -38,7 +44,11 @@ async function buildArc69Context(ctx: McpToolContext): Promise<Arc69Context | nu
       indexerClient: service.indexerClient,
       chatAccount: chatAccountResult.account,
     };
-  } catch {
+  } catch (err) {
+    log.warn('ARC-69 context build failed', {
+      agentId: ctx.agentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
