@@ -86,7 +86,7 @@ const config: AgentDeploymentConfig = {
     // ── Process Manager ────────────────────────────────────────────────
     process: {
         maxTurnsBeforeContextReset: 8,
-        inactivityTimeoutMs: parseInt(process.env.AGENT_TIMEOUT_MS ?? '1800000', 10),
+        inactivityTimeoutMs: parseInt(process.env.AGENT_TIMEOUT_MS ?? '7200000', 10),
         sandbox: {
             enabled: process.env.SANDBOX_ENABLED === 'true',
         },

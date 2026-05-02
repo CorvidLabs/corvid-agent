@@ -26,7 +26,7 @@ export interface SessionTimerCallbacks {
 }
 
 export interface SessionTimerConfig {
-  /** Inactivity timeout per session in ms. Default: 30 minutes. */
+  /** Inactivity timeout per session in ms. Default: 2 hours. */
   agentTimeoutMs: number;
   /** How long a session must run without restarting before its restart counter resets. */
   stablePeriodMs: number;
@@ -37,7 +37,7 @@ export interface SessionTimerConfig {
 }
 
 const DEFAULT_CONFIG: SessionTimerConfig = {
-  agentTimeoutMs: parseInt(process.env.AGENT_TIMEOUT_MS ?? String(30 * 60 * 1000), 10),
+  agentTimeoutMs: parseInt(process.env.AGENT_TIMEOUT_MS ?? String(2 * 60 * 60 * 1000), 10),
   stablePeriodMs: 10 * 60 * 1000,
   timeoutCheckIntervalMs: 60_000,
   startupTimeoutMs: parseInt(process.env.STARTUP_TIMEOUT_MS ?? '90000', 10),
