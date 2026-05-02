@@ -42,6 +42,7 @@ export const tables: string[] = [
         total_cost_usd    REAL DEFAULT 0,
         total_algo_spent  REAL DEFAULT 0,
         total_turns       INTEGER DEFAULT 0,
+        cumulative_turns  INTEGER DEFAULT 0,
         council_launch_id TEXT DEFAULT NULL,
         council_role      TEXT DEFAULT NULL,
         work_dir          TEXT DEFAULT NULL,

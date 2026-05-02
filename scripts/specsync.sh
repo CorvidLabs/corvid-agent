@@ -3,7 +3,7 @@
 # Downloads the correct binary from CorvidLabs/spec-sync releases on first use.
 set -euo pipefail
 
-SPECSYNC_VERSION="${SPECSYNC_VERSION:-v4.2.0}"
+SPECSYNC_VERSION="${SPECSYNC_VERSION:-v4.3.2}"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/specsync"
 BINARY="$CACHE_DIR/$SPECSYNC_VERSION/specsync"
 

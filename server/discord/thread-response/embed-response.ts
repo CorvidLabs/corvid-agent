@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { getSessionTurns } from '../../db/sessions';
+import { getSessionCumulativeTurns, getSessionTurns } from '../../db/sessions';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
 import { createLogger } from '../../lib/logger';
 import type { EventCallback } from '../../process/interfaces';
@@ -75,15 +75,25 @@ export function subscribeForResponseWithEmbed(
   // Eliminates message spam: instead of N status embeds, one embed is updated.
   let progressMessageId: string | null = null;
 
+  const getTurnInfo = () => ({
+    active: getSessionTurns(db, sessionId),
+    cumulative: getSessionCumulativeTurns(db, sessionId),
+  });
+
   /** Post or upgrade the progress message. First call sends it, subsequent calls edit it. */
   const updateProgressMessage = async (description: string, status: string, embedColor?: number) => {
-    const turns = getSessionTurns(db, sessionId);
+    const t = getTurnInfo();
     const embed = {
       description,
       color: embedColor ?? 0x95a5a6,
       author,
       footer: {
-        text: buildFooterText({ agentName, agentModel, sessionId, projectName, status }, latestContextUsage, turns),
+        text: buildFooterText(
+          { agentName, agentModel, sessionId, projectName, status },
+          latestContextUsage,
+          t.active,
+          t.cumulative,
+        ),
       },
     };
     if (progressMessageId) {
@@ -126,7 +136,7 @@ export function subscribeForResponseWithEmbed(
         // If we have an existing progress message, update it to show the crash.
         // Otherwise send a new embed.
         if (progressMessageId) {
-          const crashTurns = getSessionTurns(db, sessionId);
+          const ct = getTurnInfo();
           editEmbed(delivery, botToken, threadId, progressMessageId, {
             description: 'The agent session ended unexpectedly. Send a message to resume.',
             color: 0xff3355,
@@ -135,7 +145,8 @@ export function subscribeForResponseWithEmbed(
               text: buildFooterText(
                 { agentName, agentModel, sessionId, projectName, status: 'crashed' },
                 latestContextUsage,
-                crashTurns,
+                ct.active,
+                ct.cumulative,
               ),
             },
           }).catch((err) => {
@@ -145,7 +156,7 @@ export function subscribeForResponseWithEmbed(
             });
           });
         } else {
-          const crashTurns = getSessionTurns(db, sessionId);
+          const ct2 = getTurnInfo();
           sendEmbedWithButtons(
             delivery,
             botToken,
@@ -158,7 +169,8 @@ export function subscribeForResponseWithEmbed(
                 text: buildFooterText(
                   { agentName, agentModel, sessionId, projectName, status: 'crashed' },
                   latestContextUsage,
-                  crashTurns,
+                  ct2.active,
+                  ct2.cumulative,
                 ),
               },
             },
@@ -205,14 +217,21 @@ export function subscribeForResponseWithEmbed(
     const text = buffer;
     buffer = '';
 
-    const turns = getSessionTurns(db, sessionId);
+    const t = getTurnInfo();
     const parts = visibleEmbedParts(text);
     for (const part of parts) {
       await sendEmbed(delivery, botToken, threadId, {
         description: part,
         color,
         author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage, turns) },
+        footer: {
+          text: buildFooterText(
+            { agentName, agentModel, sessionId, projectName },
+            latestContextUsage,
+            t.active,
+            t.cumulative,
+          ),
+        },
       });
     }
   };
@@ -237,7 +256,7 @@ export function subscribeForResponseWithEmbed(
               : 'png';
       const filename = `image.${ext}`;
       const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
-      const imgTurns = getSessionTurns(db, sessionId);
+      const imgT = getTurnInfo();
       await sendEmbedWithFiles(
         delivery,
         botToken,
@@ -247,7 +266,12 @@ export function subscribeForResponseWithEmbed(
           color,
           author,
           footer: {
-            text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage, imgTurns),
+            text: buildFooterText(
+              { agentName, agentModel, sessionId, projectName },
+              latestContextUsage,
+              imgT.active,
+              imgT.cumulative,
+            ),
           },
         },
         [attachment],
@@ -334,7 +358,7 @@ export function subscribeForResponseWithEmbed(
     if (event.type === 'context_warning') {
       const warning = event as { level?: string; message?: string; usagePercent?: number };
       if (warning.level === 'critical') {
-        const warnTurns = getSessionTurns(db, sessionId);
+        const wt = getTurnInfo();
         sendEmbed(delivery, botToken, threadId, {
           description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
           color: 0xf0b232, // yellow/warning
@@ -343,7 +367,8 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: 'context warning' },
               latestContextUsage,
-              warnTurns,
+              wt.active,
+              wt.cumulative,
             ),
           },
         }).catch((err) => {
@@ -364,7 +389,7 @@ export function subscribeForResponseWithEmbed(
 
       // Mark the progress message as done (if it exists) before sending the completion embed
       if (progressMessageId) {
-        const doneTurns = getSessionTurns(db, sessionId);
+        const dt = getTurnInfo();
         editEmbed(delivery, botToken, threadId, progressMessageId, {
           description: '✅ Done',
           color: 0x57f287,
@@ -373,7 +398,8 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: 'done' },
               latestContextUsage,
-              doneTurns,
+              dt.active,
+              dt.cumulative,
             ),
           },
         }).catch((err) => {
@@ -393,11 +419,12 @@ export function subscribeForResponseWithEmbed(
             .query<
               {
                 total_turns: number;
+                cumulative_turns: number | null;
                 work_dir: string | null;
                 created_at: string;
               },
               [string]
-            >('SELECT total_turns, work_dir, created_at FROM sessions WHERE id = ?')
+            >('SELECT total_turns, cumulative_turns, work_dir, created_at FROM sessions WHERE id = ?')
             .get(sessionId);
 
           // Fetch tool call count from session_metrics
@@ -419,8 +446,11 @@ export function subscribeForResponseWithEmbed(
 
             // Turns
             statsTurns = row.total_turns;
+            const cumTurns = row.cumulative_turns ?? row.total_turns;
             if (row.total_turns > 0) {
-              fields.push({ name: 'Turns', value: String(row.total_turns), inline: true });
+              const turnsDisplay =
+                cumTurns > row.total_turns ? `${row.total_turns} (${cumTurns} total)` : String(row.total_turns);
+              fields.push({ name: 'Turns', value: turnsDisplay, inline: true });
             }
 
             // Tool calls
@@ -485,6 +515,7 @@ export function subscribeForResponseWithEmbed(
 
         const footerCtx = { agentName, agentModel, sessionId, projectName, status: 'done' };
         const footerStats = { filesChanged: statsFiles, turns: statsTurns, tools: statsTools, commits: statsCommits };
+        const statsCumulative = getSessionCumulativeTurns(db, sessionId);
 
         // Build contextual buttons based on what the session actually did
         const buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }> = [];
@@ -510,7 +541,7 @@ export function subscribeForResponseWithEmbed(
             color: 0x57f287,
             author,
             ...(fields.length > 0 ? { fields } : {}),
-            footer: { text: buildFooterWithStats(footerCtx, footerStats, latestContextUsage) },
+            footer: { text: buildFooterWithStats(footerCtx, footerStats, latestContextUsage, statsCumulative) },
           },
           [buildActionRow(...buttons)],
         );
@@ -534,7 +565,7 @@ export function subscribeForResponseWithEmbed(
       const { title, description, color: errColor } = sessionErrorEmbed(errorType, errEvent.error?.message);
 
       // If we have a progress message, update it to show the error; otherwise send new
-      const errTurns = getSessionTurns(db, sessionId);
+      const et = getTurnInfo();
       if (progressMessageId) {
         editEmbed(delivery, botToken, threadId, progressMessageId, {
           title,
@@ -545,7 +576,8 @@ export function subscribeForResponseWithEmbed(
             text: buildFooterText(
               { agentName, agentModel, sessionId, projectName, status: errorType },
               latestContextUsage,
-              errTurns,
+              et.active,
+              et.cumulative,
             ),
           },
         }).catch((err) => {
@@ -568,7 +600,8 @@ export function subscribeForResponseWithEmbed(
               text: buildFooterText(
                 { agentName, agentModel, sessionId, projectName, status: errorType },
                 latestContextUsage,
-                errTurns,
+                et.active,
+                et.cumulative,
               ),
             },
           },

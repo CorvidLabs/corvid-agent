@@ -85,7 +85,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleSendMessage` | `(ctx, { to_agent, message, thread? })` | `Promise<CallToolResult>` | Send agent-to-agent message with dedup and depth check |
 | `handleSaveMemory` | `(ctx, { key, content })` | `Promise<CallToolResult>` | Save/update an agent memory (encrypts if mnemonic available) |
 | `handlePromoteMemory` | `(ctx, { key })` | `Promise<CallToolResult>` | Promote a short-term memory to on-chain ARC-69 storage |
-| `handleRecallMemory` | `(ctx, { query, limit? })` | `Promise<CallToolResult>` | FTS search of agent memories |
+| `handleRecallMemory` | `(ctx, { key?, query? })` | `Promise<CallToolResult>` | Recall agent memory by exact key or FTS search query |
 | `handleReadOnChainMemories` | `(ctx, { search?, limit? })` | `Promise<CallToolResult>` | Read memories directly from on-chain storage via indexer |
 | `handleSyncOnChainMemories` | `(ctx, { limit? })` | `Promise<CallToolResult>` | Sync on-chain memories back to local SQLite cache |
 | `handleDeleteMemory` | `(ctx, { key, mode? })` | `Promise<CallToolResult>` | Delete an ARC-69 memory by key. Mode is 'soft' (default) or 'hard' |
@@ -97,7 +97,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleManageSchedule` | `(ctx, { action, ... })` | `Promise<CallToolResult>` | CRUD + approve/deny for agent schedules |
 | `handleListProjects` | `(ctx)` | `Promise<CallToolResult>` | List all available projects with IDs, names, and working directories |
 | `handleCurrentProject` | `(ctx)` | `Promise<CallToolResult>` | Show the current agent's default project |
-| `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. If both are omitted and `ctx.sessionId` is set, uses that session's `projectId` before falling back to the agent's `defaultProjectId` in `WorkTaskService`. `agent_id` delegates execution and attribution to a specific agent |
+| `handleCreateWorkTask` | `(ctx, { description, project_id?, project_name?, model_tier?, agent_id?, min_trust_level? })` | `Promise<CallToolResult>` | Create a work task (with daily rate limit). Resolves `project_name` to `project_id` if provided. If both are omitted and `ctx.sessionId` is set, uses that session's `projectId` before falling back to the agent's `defaultProjectId` in `WorkTaskService`. `agent_id` delegates execution and attribution to a specific agent. `min_trust_level` sets required trust (`low`, `medium`, `high`, `verified`) |
 | `handleCheckWorkStatus` | `(ctx, { task_id })` | `Promise<CallToolResult>` | Check the status of a work task by ID |
 | `handleEscalateWorkTask` | `(ctx, { task_id, action: 'retry' \| 'retry_opus' \| 'cancel' })` | `Promise<CallToolResult>` | Escalate a stuck work task: retry with same model, retry with Opus, or cancel |
 | `handleListWorkTasks` | `(ctx, { status?, limit? })` | `Promise<CallToolResult>` | List work tasks for the calling agent, optionally filtered by status |
