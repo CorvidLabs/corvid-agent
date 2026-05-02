@@ -167,6 +167,7 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 | `getTask` | `(id: string)` | `WorkTask \| null` | Fetch a task by ID |
 | `listTasks` | `(agentId?: string)` | `WorkTask[]` | List tasks, optionally filtered by agent |
 | `cancelTask` | `(id: string)` | `Promise<WorkTask \| null>` | Stop the session, fail the task, clean up worktree |
+| `escalateResume` | `(id: string, action: 'retry' \| 'retry_opus' \| 'cancel')` | `Promise<WorkTask \| null>` | Resume or cancel a task in `escalation_needed` state |
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Set the AgentMessenger instance for lifecycle notifications |
 | `onComplete` | `(taskId: string, callback: (task: WorkTask) => void)` | `void` | Register a completion callback |
 | `onStatusChange` | `(taskId: string, callback: StatusChangeCallback) ` | `void` | Register a status-change callback (fires on branching, running, validating) |
@@ -177,13 +178,14 @@ Manages the full lifecycle of autonomous work tasks: create a git worktree, spaw
 
 ## MCP Tool Interface
 
-Three MCP tools expose the work task system to agents:
+Four MCP tools expose the work task system to agents:
 
 | Tool | Description |
 |------|-------------|
 | `corvid_create_work_task` | Create a work task with optional `model_tier` (light/standard/heavy) for cost-aware delegation and optional `agent_id` for delegating to a specific agent |
 | `corvid_check_work_status` | Poll a work task by ID — returns status, branch, PR URL, errors |
-| `corvid_list_work_tasks` | List work tasks for the calling agent, optionally filtered by status |
+| `corvid_list_work_tasks` | List work tasks for the calling agent, optionally filtered by status (includes `escalation_needed`) |
+| `corvid_work_task_escalate` | Resume or cancel a task in `escalation_needed` state: `retry` (same model), `retry_opus` (Opus tier), or `cancel` |
 
 ### Model Tier Parameter
 

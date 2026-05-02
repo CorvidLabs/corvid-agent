@@ -6,7 +6,8 @@ export type WorkTaskStatus =
   | 'validating'
   | 'completed'
   | 'failed'
-  | 'paused';
+  | 'paused'
+  | 'escalation_needed';
 export type WorkTaskSource = 'web' | 'algochat' | 'agent' | 'discord' | 'telegram';
 export type RetryBackoff = 'fixed' | 'linear' | 'exponential';
 

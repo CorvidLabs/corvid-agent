@@ -59,6 +59,8 @@ export interface SessionLifecycleContext {
   notifyStatusChange: (taskId: string) => void;
   subscribeForCompletion: (taskId: string, sessionId: string) => void;
   notifyOwner: ((params: { agentId: string; title: string; message: string; level: string }) => Promise<void>) | null;
+  /** Injectable override for `runValidation` — used in tests to avoid module-level mocking. */
+  runValidation?: (workingDir: string) => Promise<{ passed: boolean; output: string }>;
 }
 
 export async function handleSessionEnd(
@@ -81,7 +83,8 @@ export async function handleSessionEnd(
   ctx.notifyStatusChange(taskId);
   log.info('Running post-session validation', { taskId });
 
-  const validation = await runValidation(validationDir);
+  const validate = ctx.runValidation ?? runValidation;
+  const validation = await validate(validationDir);
   const iteration = task.iterationCount || 1;
 
   if (validation.passed) {
@@ -93,8 +96,8 @@ export async function handleSessionEnd(
   log.warn('Validation failed', { taskId, iteration, maxIterations: WORK_MAX_ITERATIONS });
 
   if (iteration >= WORK_MAX_ITERATIONS) {
-    // Max iterations reached — fail the task and alert the owner
-    updateWorkTaskStatus(ctx.db, taskId, 'failed', {
+    // Max iterations reached — escalate to owner instead of silently failing
+    updateWorkTaskStatus(ctx.db, taskId, 'escalation_needed', {
       error: `Validation failed after ${iteration} iteration(s):\n${validation.output.slice(0, 2000)}`,
       summary: sanitizeSessionSummary(sessionOutput, 500),
     });
@@ -106,8 +109,8 @@ export async function handleSessionEnd(
       ctx
         .notifyOwner({
           agentId: task.agentId,
-          title: `Work task failed after ${iteration} iteration(s)`,
-          message: `Task: "${shortDesc}"\n\nValidation output:\n${shortError}\n\nConsider retrying with a higher model tier (Sonnet → Opus).`,
+          title: `Work task needs attention after ${iteration} iteration(s)`,
+          message: `Task: "${shortDesc}"\n\nValidation output:\n${shortError}\n\nUse corvid_work_task_escalate with task_id="${taskId}" to retry (optionally upgrading to Opus) or cancel.`,
           level: 'error',
         })
         .catch((err) => {
