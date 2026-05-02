@@ -288,7 +288,6 @@ const MIGRATIONS: Record<number, string[]> = {
     `CREATE INDEX IF NOT EXISTS idx_memory_attestations_key ON memory_attestations(memory_key)`,
   ],
   123: [
-    // Activity summaries: on-chain periodic rollups of agent activity
     `CREATE TABLE IF NOT EXISTS activity_summaries (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       period       TEXT NOT NULL,
@@ -304,16 +303,13 @@ const MIGRATIONS: Record<number, string[]> = {
     `CREATE INDEX IF NOT EXISTS idx_activity_summaries_hash ON activity_summaries(hash)`,
   ],
   124: [
-    // Session context token tracking
     `ALTER TABLE sessions ADD COLUMN last_context_tokens INTEGER`,
     `ALTER TABLE sessions ADD COLUMN last_context_window INTEGER`,
   ],
   125: [
-    // Cumulative turn counter across session restarts
     `ALTER TABLE sessions ADD COLUMN cumulative_turns INTEGER DEFAULT 0`,
   ],
   126: [
-    // Council reputation gating: minimum trust level required for council participation
     `ALTER TABLE councils ADD COLUMN min_trust_level TEXT`,
   ],
 };
