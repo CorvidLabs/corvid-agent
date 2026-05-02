@@ -869,9 +869,32 @@
           <li><strong>Security:</strong> SDK lockfile updated to 0.92.0+ to fix GHSA-p7fg-763f-g4gf.</li>
         </ul>
 
-        <h3>Fledge: Now Primary Tooling</h3>
-        <p>As of v0.65, <strong>Fledge is the primary development interface</strong> for corvid-agent. CLAUDE.md, all agent verification flows, and all documentation now point to <code>fledge lanes run verify</code> as the single command to validate changes. 28 files were updated across the codebase, and the team is fully committed to using Fledge for every workflow &mdash; lint, test, typecheck, spec-check, review, release.</p>
-        <p>New lanes and tasks added: <code>release-check</code> (full verify + deps + changelog), <code>status</code> (quick project health snapshot), <code>deps-check</code>, <code>review</code>, <code>loc</code>, <code>changelog</code>. All 11 plugins tested and working. 10,627 tests green.</p>
+        <h3>Fledge 1.0.0: From Experiment to Primary Tooling</h3>
+        <p><strong>Fledge hit 1.0.0</strong> &mdash; and we went all-in. What started as an internal experiment to unify our scattered build scripts, Makefiles, and CI glue is now a stable, production-grade CLI that every agent and human on the team uses daily. The jump from 0.17.0 to 1.0.0 represents full API stability, backwards compatibility guarantees, and a mature plugin ecosystem.</p>
+
+        <h4>What Changed at 1.0</h4>
+        <ul>
+          <li><strong>Stable command surface:</strong> All commands (<code>fledge run</code>, <code>fledge lanes</code>, <code>fledge work</code>, <code>fledge spec</code>, <code>fledge review</code>, <code>fledge release</code>) are now frozen &mdash; no more breaking changes without a major version bump.</li>
+          <li><strong>Plugin protocol v1:</strong> JSON-over-stdin/stdout with structured capabilities model. Plugins declare what they need, users approve during installation. 11 plugins stable and tested.</li>
+          <li><strong>Template engine matured:</strong> Six built-in templates plus community contributions (Angular, FastAPI, MCP servers, Swift packages, monorepos).</li>
+          <li><strong>Structured output everywhere:</strong> Every command supports <code>--json</code> for machine parsing &mdash; critical for AI agent consumption.</li>
+        </ul>
+
+        <h4>Full Adoption Across corvid-agent</h4>
+        <p>28 files updated across the codebase. <code>CLAUDE.md</code>, <code>AGENTS.md</code>, <code>CONTRIBUTING.md</code>, all spec files, CI configs, and agent verification flows now point to <code>fledge lanes run verify</code> as the single command to validate changes. No more <code>bun run lint &amp;&amp; bun x tsc &amp;&amp; bun test &amp;&amp; bun run spec:check</code> &mdash; one command does it all.</p>
+        <p>New lanes and tasks added for this project:</p>
+        <ul>
+          <li><code>verify</code> lane &mdash; lint, typecheck, test, spec-check (the CI pipeline)</li>
+          <li><code>release-check</code> lane &mdash; full verify + deps audit + changelog validation</li>
+          <li><code>status</code> lane &mdash; quick project health snapshot</li>
+          <li><code>audit</code> lane &mdash; security, license, and dependency sweep</li>
+          <li>Individual tasks: <code>deps-check</code>, <code>review</code>, <code>loc</code>, <code>changelog</code></li>
+        </ul>
+
+        <h4>Why This Matters for Multi-Agent Development</h4>
+        <p>When five AI agents and two humans share a codebase, everyone needs to speak the same language. Fledge is that language. Jackdaw runs <code>fledge lanes run verify</code> before opening a PR. Rook runs <code>fledge review</code> to audit it. Magpie runs <code>fledge doctor</code> to validate environment before starting work. Same tools, same output format, same expectations &mdash; whether the operator is carbon or silicon.</p>
+        <p>The zero-config defaults mean new agents (or new humans) can clone the repo and immediately validate their work without reading a setup guide. That&rsquo;s the real win: <strong>shared workflow as infrastructure</strong>, not documentation that drifts.</p>
+        <p>All 11 plugins tested and passing. 10,627 tests green. <a href="https://github.com/CorvidLabs/fledge" target="_blank">Fledge on GitHub</a>.</p>
 
         <h3>By the Numbers</h3>
         <table style="width:100%; border-collapse:collapse; margin:1em 0;">
