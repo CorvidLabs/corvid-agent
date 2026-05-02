@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { Session } from '../../shared/types';
+import type { ObservationSource } from '../../shared/types/memories';
 import type { ScheduleActionType } from '../../shared/types/schedules';
 import { saveMemory } from '../db/agent-memories';
 import { getAgent } from '../db/agents';
@@ -159,6 +160,8 @@ interface SessionMeta {
   contextSummary?: string;
   /** Last known context window usage percentage, updated on context_usage events. */
   lastContextUsagePercent?: number;
+  /** Cached channel/thread ID for observation scoping (resolved lazily on first message). */
+  channelId?: string | null;
 }
 
 export class ProcessManager {
@@ -800,16 +803,10 @@ export class ProcessManager {
 
     const effectiveProject = { ...project, workingDir: resolved.dir };
 
-    // Save the user message and increment turn count
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
-      const newTurns = (session.totalTurns ?? 0) + 1;
-      updateSessionTurns(this.db, session.id, newTurns);
-      session.totalTurns = newTurns;
-      const existingMeta = this.sessionMeta.get(session.id);
-      if (existingMeta) existingMeta.turnCount = newTurns;
     }
-    const resumePrompt = this.buildResumePrompt(session, prompt);
+    const { prompt: resumePrompt, activeTurns } = this.buildResumePrompt(session, prompt);
 
     // Resolve agent and provider
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
@@ -831,6 +828,8 @@ export class ProcessManager {
         }
       }
     }
+
+    this.applyResumeMetrics(session, activeTurns, resumePrompt, effectiveAgent?.model);
 
     // Reuse startProcessWithResolvedDir — it handles SDK vs direct routing + registration
     await this.startProcessWithResolvedDir(session, effectiveProject, effectiveAgent, resumePrompt ?? '', provider, {
@@ -1076,14 +1075,13 @@ export class ProcessManager {
 
     let effectiveAgent = session.agentId ? getAgent(this.db, session.agentId) : null;
 
-    const resumePrompt = this.buildResumePrompt(session, prompt);
+    const { prompt: resumePrompt, activeTurns } = this.buildResumePrompt(session, prompt);
 
     if (prompt) {
       addSessionMessage(this.db, session.id, 'user', prompt);
-      const newTurns = (session.totalTurns ?? 0) + 1;
-      updateSessionTurns(this.db, session.id, newTurns);
-      session.totalTurns = newTurns;
     }
+
+    this.applyResumeMetrics(session, activeTurns + (prompt ? 1 : 0), resumePrompt ?? '', effectiveAgent?.model);
 
     const providerType = effectiveAgent?.provider as LlmProviderType | undefined;
     const registry = LlmProviderRegistry.getInstance();
@@ -1294,6 +1292,7 @@ export class ProcessManager {
       },
     } as ClaudeStreamEvent);
 
+    this.finalizeTokenTracking(sessionId);
     cp.kill();
     this.processes.delete(sessionId);
     updateSessionPid(this.db, sessionId, null);
@@ -1301,7 +1300,28 @@ export class ProcessManager {
     return true;
   }
 
-  private buildResumePrompt(session: Session, newPrompt?: string): string {
+  private applyResumeMetrics(session: Session, totalTurns: number, resumePrompt: string, agentModel?: string): void {
+    session.totalTurns = totalTurns;
+    updateSessionTurns(this.db, session.id, totalTurns);
+    const existingMeta = this.sessionMeta.get(session.id);
+    if (existingMeta) existingMeta.turnCount = totalTurns;
+    const tokens = estimateTokens(resumePrompt);
+    const contextWindow = getContextBudget(agentModel);
+    session.lastContextTokens = tokens;
+    session.lastContextWindow = contextWindow;
+    updateSessionContextTokens(this.db, session.id, tokens, contextWindow);
+    const usagePercent = contextWindow > 0 ? Math.round((tokens / contextWindow) * 100) : 0;
+    if (existingMeta) existingMeta.lastContextUsagePercent = usagePercent;
+    this.eventBus.emit(session.id, {
+      type: 'context_usage',
+      session_id: session.id,
+      estimatedTokens: tokens,
+      contextWindow,
+      usagePercent,
+    } as ClaudeStreamEvent);
+  }
+
+  private buildResumePrompt(session: Session, newPrompt?: string): { prompt: string; activeTurns: number } {
     const messages = getSessionMessages(this.db, session.id);
     const meta = this.sessionMeta.get(session.id);
 
@@ -1314,22 +1334,41 @@ export class ProcessManager {
       this.db.query('UPDATE sessions SET server_restart_initiated_at = NULL WHERE id = ?').run(session.id);
     }
 
-    // Load recent active observations for this agent and increment their access count
-    // Boost observations from the same source as the current session
-    const observations = session.agentId
-      ? listObservations(this.db, session.agentId, {
+    // Load recent active observations for this agent.
+    // For channel-based sessions (Discord/Telegram/AlgoChat), load thread-specific
+    // observations first, then fill remaining slots with general agent observations.
+    const channelId = this.resolveChannelId(session.id);
+    let observations: import('../../shared/types/memories').MemoryObservation[] = [];
+    if (session.agentId) {
+      if (channelId) {
+        const channelObs = listObservations(this.db, session.agentId, {
+          status: 'active',
+          limit: 15,
+          channelId,
+        });
+        const channelIds = new Set(channelObs.map((o) => o.id));
+        const globalObs = listObservations(this.db, session.agentId, {
           status: 'active',
           limit: 10,
           sourcePreference: (['discord', 'telegram', 'algochat'] as const).find((s) => s === session.source),
-        })
-      : [];
+        }).filter((o) => !channelIds.has(o.id));
+        observations = [...channelObs, ...globalObs].slice(0, 20);
+      } else {
+        observations = listObservations(this.db, session.agentId, {
+          status: 'active',
+          limit: 10,
+          sourcePreference: (['discord', 'telegram', 'algochat'] as const).find((s) => s === session.source),
+        });
+      }
+    }
     for (const obs of observations) {
       boostObservation(this.db, obs.id, 0);
     }
 
-    if (messages.length === 0) return newPrompt ?? session.initialPrompt ?? '';
+    if (messages.length === 0) return { prompt: newPrompt ?? session.initialPrompt ?? '', activeTurns: 0 };
 
     const recent = messages.slice(-20);
+    const activeTurns = recent.filter((m) => m.role === 'user').length;
     const historyLines = recent
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => {
@@ -1382,7 +1421,7 @@ export class ProcessManager {
       parts.push('', newPrompt);
     }
 
-    return parts.join('\n');
+    return { prompt: parts.join('\n'), activeTurns };
   }
 
   stopProcess(sessionId: string, reason?: string): void {
@@ -1421,6 +1460,28 @@ export class ProcessManager {
   }
 
   /**
+   * Ensure the DB has a non-NULL token count for this session.
+   * Called before meta deletion so we never lose the last known context usage.
+   */
+  private finalizeTokenTracking(sessionId: string): void {
+    const meta = this.sessionMeta.get(sessionId);
+    if (!meta?.lastContextUsagePercent) return;
+
+    const session = getSession(this.db, sessionId);
+    if (!session || (session.lastContextTokens != null && session.lastContextTokens > 0)) return;
+
+    const fallback = this.computeFallbackContextUsage(sessionId);
+    if (fallback) {
+      updateSessionContextTokens(this.db, sessionId, fallback.estimatedTokens, fallback.contextWindow);
+      log.debug('Finalized token tracking on cleanup', {
+        sessionId: sessionId.slice(0, 8),
+        estimatedTokens: fallback.estimatedTokens,
+        usagePercent: fallback.usagePercent,
+      });
+    }
+  }
+
+  /**
    * Remove all in-memory state for a session. Idempotent -- safe to call
    * multiple times or for sessions that have already been partially cleaned.
    *
@@ -1430,12 +1491,13 @@ export class ProcessManager {
   cleanupSessionState(sessionId: string): void {
     this.startingSession.delete(sessionId);
     this.processes.delete(sessionId);
-    this.sessionMeta.delete(sessionId);
     this.eventBus.removeSessionSubscribers(sessionId);
+    this.finalizeTokenTracking(sessionId);
     this.resilienceManager.deletePausedSession(sessionId);
     this.timerManager.cleanupSession(sessionId);
     this.approvalManager.cancelSession(sessionId);
     this.ownerQuestionManager.cancelSession(sessionId);
+    this.sessionMeta.delete(sessionId);
   }
 
   /**
@@ -1491,6 +1553,7 @@ export class ProcessManager {
             .map((b) => b.text)
             .join('\n');
     addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
+    if (textContent) this.recordMessageObservation(sessionId, 'user', textContent);
 
     const meta = this.sessionMeta.get(sessionId);
     if (meta) {
@@ -1730,6 +1793,7 @@ export class ProcessManager {
       const text = extractContentText(event.message.content);
       if (text?.trim()) {
         addSessionMessage(this.db, sessionId, 'assistant', text);
+        this.recordMessageObservation(sessionId, 'assistant', text);
       }
     }
 
@@ -1932,6 +1996,7 @@ export class ProcessManager {
     if (code !== 0 && meta?.source === 'algochat') {
       this.processes.delete(sessionId);
       this.eventBus.removeSessionSubscribers(sessionId);
+      this.finalizeTokenTracking(sessionId);
       this.resilienceManager.deletePausedSession(sessionId);
       this.timerManager.cleanupSession(sessionId);
       this.approvalManager.cancelSession(sessionId);
@@ -2004,6 +2069,7 @@ export class ProcessManager {
       const counterparty = participant ? ` with ${participant}` : '';
       const content = `Conversation summary (${session.source ?? 'unknown'}${counterparty}, session ${session.id}):\n${summary}`;
 
+      const channelId = this.resolveChannelId(session.id);
       recordObservation(this.db, {
         agentId: session.agentId!,
         source: 'session',
@@ -2011,12 +2077,66 @@ export class ProcessManager {
         content,
         suggestedKey: `conv-summary:${session.id}`,
         relevanceScore: 2.0,
+        channelId: channelId ?? undefined,
       });
 
       log.info('Saved context summary as observation', { sessionId: session.id });
     } catch (err) {
       log.warn('Failed to save context summary observation', {
         sessionId: session.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Resolve the channel/thread ID for a session, caching in sessionMeta.
+   * For Discord: looks up the thread ID from discord_thread_sessions.
+   * Returns null for non-channel-based sessions.
+   */
+  private resolveChannelId(sessionId: string): string | null {
+    const meta = this.sessionMeta.get(sessionId);
+    if (meta && meta.channelId !== undefined) return meta.channelId ?? null;
+
+    const session = getSession(this.db, sessionId);
+    let channelId: string | null = null;
+
+    if (session?.source === 'discord') {
+      channelId = getThreadIdForSession(this.db, sessionId);
+    }
+
+    if (meta) meta.channelId = channelId;
+    return channelId;
+  }
+
+  /**
+   * Record a user or assistant message as a short-term observation.
+   * Tagged with channel_id so future resumes can recall thread-specific context.
+   */
+  private recordMessageObservation(sessionId: string, role: 'user' | 'assistant', content: string): void {
+    try {
+      const session = getSession(this.db, sessionId);
+      if (!session?.agentId) return;
+
+      const source = session.source as ObservationSource | undefined;
+      if (!source || !['discord', 'telegram', 'algochat'].includes(source)) return;
+
+      const channelId = this.resolveChannelId(sessionId);
+      const truncated = content.length > 500 ? `${content.slice(0, 500)}...` : content;
+      const prefix = role === 'user' ? 'User' : 'Assistant';
+
+      recordObservation(this.db, {
+        agentId: session.agentId,
+        source: source as ObservationSource,
+        sourceId: sessionId,
+        content: `[${prefix}]: ${truncated}`,
+        relevanceScore: 1.0,
+        channelId: channelId ?? undefined,
+      });
+    } catch (err) {
+      log.warn('Failed to record message observation', {
+        sessionId: sessionId.slice(0, 8),
+        role,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -2088,16 +2208,18 @@ export class ProcessManager {
         .filter(Boolean)
         .join(' | ');
 
+      const channelId = this.resolveChannelId(sessionId);
       recordObservation(this.db, {
         agentId: session.agentId,
         source: 'discord',
         sourceId: sessionId,
         content: summary,
         suggestedKey: `discord-session:${sessionId}`,
-        relevanceScore: 2.0, // Higher score than message observations
+        relevanceScore: 2.0,
+        channelId: channelId ?? undefined,
       });
 
-      log.debug('Recorded session completion observation', { sessionId, summary: summary.slice(0, 100) });
+      log.debug('Recorded session completion observation', { sessionId, channelId, summary: summary.slice(0, 100) });
     } catch (err) {
       log.warn('Failed to record session completion observation', {
         sessionId,

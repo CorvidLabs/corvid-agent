@@ -217,7 +217,7 @@ describe('Validation loop iteration control', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const updatedTask = getWorkTask(db, task.id);
-    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.status).toBe('escalation_needed');
     expect(updatedTask!.error).toContain('Validation failed after 3 iteration(s)');
   });
 
@@ -298,7 +298,7 @@ describe('Owner notification on max-iteration failure', () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     const updatedTask = getWorkTask(db, task.id);
-    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.status).toBe('escalation_needed');
 
     // Owner notification should have been fired
     expect(notifyOwnerCalls.length).toBeGreaterThanOrEqual(1);
@@ -306,7 +306,7 @@ describe('Owner notification on max-iteration failure', () => {
     expect(notification.level).toBe('error');
     expect(notification.title).toContain('3 iteration');
     expect(notification.message).toContain('Fix the critical bug in auth module');
-    expect(notification.message).toContain('Sonnet');
+    expect(notification.message).toContain('corvid_work_task_escalate');
   });
 
   test('notifyOwner is NOT called for intermediate validation failures', async () => {
@@ -350,7 +350,7 @@ describe('Owner notification on max-iteration failure', () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     const updatedTask = getWorkTask(db, task.id);
-    expect(updatedTask!.status).toBe('failed');
+    expect(updatedTask!.status).toBe('escalation_needed');
     expect(updatedTask!.error).toContain('Validation failed after 3');
   });
 });

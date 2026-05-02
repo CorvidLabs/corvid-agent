@@ -5,13 +5,11 @@
  * - Task is marked `escalation_needed` (not `failed`)
  * - Owner is notified with actionable instructions
  * - Notification failures are non-fatal
+ *
+ * Uses context-injected `runValidation` instead of mock.module() to avoid
+ * Bun 1.x mock leakage across test files.
  */
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-
-// Must mock these before importing session-lifecycle
-mock.module('../work/validation', () => ({
-  runValidation: mock(async () => ({ passed: false, output: 'tsc: error TS2322' })),
-}));
 
 mock.module('../lib/worktree', () => ({
   removeWorktree: mock(async () => ({ success: true })),
@@ -31,6 +29,8 @@ let db: Database;
 const AGENT_ID = 'agent-1';
 const PROJECT_ID = 'proj-1';
 
+const mockRunValidation = async (_dir: string) => ({ passed: false, output: 'tsc: error TS2322' });
+
 function makeCtx(overrides?: Partial<SessionLifecycleContext>): SessionLifecycleContext {
   return {
     db,
@@ -39,6 +39,7 @@ function makeCtx(overrides?: Partial<SessionLifecycleContext>): SessionLifecycle
     notifyStatusChange: mock(() => {}),
     subscribeForCompletion: mock(() => {}),
     notifyOwner: null,
+    runValidation: mockRunValidation,
     ...overrides,
   };
 }

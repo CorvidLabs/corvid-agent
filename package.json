@@ -94,10 +94,11 @@
     "marked": "^18.0.2",
     "opusscript": "^0.1.1",
     "web-tree-sitter": "0.26.8",
-    "zod": "^4.3.6"
+    "zod": "~4.3.6"
   },
   "patchedDependencies": {},
   "overrides": {
+    "zod": "~4.3.6",
     "typescript": "~5.9.3",
     "minimatch": ">=9.0.7",
     "ajv": ">=8.18.0",

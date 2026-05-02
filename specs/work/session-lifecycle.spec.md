@@ -21,7 +21,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 | Type | Description |
 |------|-------------|
-| `SessionLifecycleContext` | Context object providing `db`, `processManager`, `notifyCallbacks`, `subscribeForCompletion`, and optional `notifyOwner` |
+| `SessionLifecycleContext` | Context object providing `db`, `processManager`, `notifyCallbacks`, `subscribeForCompletion`, optional `notifyOwner`, and optional `runValidation` (injectable override for testing) |
 
 ### Exported Functions
 

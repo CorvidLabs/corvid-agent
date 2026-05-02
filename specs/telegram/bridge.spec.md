@@ -74,11 +74,11 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 11. **Voice responses**: If the agent has `voiceEnabled` and `OPENAI_API_KEY` is set, responses are sent as voice notes via `synthesizeWithCache`, with text sent alongside for accessibility. Falls back to text-only on voice synthesis failure
 12. **Message chunking**: Telegram has a 4096-character limit per message. Long responses are split into chunks at that boundary
 13. **Agent selection**: When creating a new session, the bridge uses the first agent from `listAgents`. If the agent has a `defaultProjectId`, that project is used; otherwise the first project from `listProjects`
-14. **Slash commands**: `/start` sends a welcome message, `/status` reports the current session ID, `/new` clears the user's session mapping, `/compact` triggers context compaction on the active session — clears the session mapping and confirms to the user; if no active session, replies with an error
+14. **Slash commands**: `/start` sends a welcome message, `/status` reports the current session ID, `/new` clears the user's session mapping, `/compact` compacts the current session's context
 15. **Idempotent start**: Calling `start()` when already running is a no-op
-16. **Session error handling**: When a `session_error` event is received on the subscription, the bridge sends a user-facing message matching the `errorType` (`context_compacted`, `context_exhausted`, `credits_exhausted`, `timeout`, `crash`, or a fallback for unknown types), then unsubscribes the callback
-17. **Session exit handling**: When a `session_exited` event is received, the bridge flushes any buffered output and unsubscribes the callback
-18. **Subscription cleanup**: The subscription callback is stored by reference and explicitly unsubscribed via `processManager.unsubscribe()` after receiving a `result`, `session_error`, or `session_exited` event — preventing listener leaks on long-running bridges
+16. **Session error handling**: `subscribeForResponse` handles `session_error` events by mapping `errorType` (context_exhausted, context_compacted, credits_exhausted, timeout, crash, spawn_error) to user-facing text messages via `sessionErrorToText()`, sent to the Telegram chat
+17. **Session exit handling**: `subscribeForResponse` handles `session_exited` events by flushing any buffered text and cleaning up
+18. **Subscription cleanup**: The subscription callback is unsubscribed from the ProcessManager after `result`, `session_error`, or `session_exited` events to prevent listener accumulation
 
 ## Behavioral Examples
 
@@ -117,6 +117,30 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 - **Given** `allowedUserIds` is `["123", "456"]`
 - **When** user with Telegram ID 789 sends a message
 - **Then** the bridge replies "Unauthorized."
+
+### Scenario: /compact command with active session
+
+- **Given** user 12345 has an active session
+- **When** user sends `/compact`
+- **Then** `processManager.compactSession()` is called on their session and the user receives a confirmation message
+
+### Scenario: /compact command with no session
+
+- **Given** user 12345 has no active session
+- **When** user sends `/compact`
+- **Then** the user receives `"No active session. Send a message to start one."`
+
+### Scenario: Session error reported to user
+
+- **Given** user 12345 has an active session and is subscribed for responses
+- **When** a `session_error` event fires with `errorType: 'context_exhausted'`
+- **Then** the user receives a plain-text message explaining the error, and the subscription is cleaned up
+
+### Scenario: Session exited cleans up subscription
+
+- **Given** user 12345 has an active session and is subscribed for responses
+- **When** a `session_exited` event fires
+- **Then** any buffered text is flushed, and the subscription is cleaned up
 
 ### Scenario: Long response chunked
 
@@ -162,13 +186,14 @@ Bidirectional Telegram bot bridge that routes Telegram messages to agent session
 | Telegram API call fails | Logs error, throws with `"Telegram API error ({method}): status {code}"` |
 | Poll error | Logs error, continues polling on next cycle |
 | Voice synthesis fails | Falls back to text message |
-| `session_error` (context_exhausted) | Sends `"Context limit reached — send a message to start a new session."` |
-| `session_error` (credits_exhausted) | Sends `"Credits exhausted — top up credits and send a message to resume."` |
-| `session_error` (crash) | Sends `"Session crashed — send a message to restart."` |
-| `session_error` (timeout) | Sends `"Session timed out — send a message to restart."` |
-| `session_error` (context_compacted) | Sends `"Context compacted — session condensed. Send a message to continue."` |
-| `/compact` with no session | Replies `"No active session. Start a conversation first."` |
-| `/compact` with no running process | Replies `"No active session process to compact."` |
+| Session error (context_exhausted) | Sends `"Context limit reached..."` to user, unsubscribes |
+| Session error (context_compacted) | Sends `"Context compacted..."` to user, unsubscribes |
+| Session error (credits_exhausted) | Sends `"Credits exhausted..."` to user, unsubscribes |
+| Session error (timeout) | Sends `"Session timed out..."` to user, unsubscribes |
+| Session error (crash) | Sends `"The agent session crashed..."` to user, unsubscribes |
+| Session error (spawn_error) | Sends `"Failed to start agent session..."` to user, unsubscribes |
+| `/compact` with no session | Replies `"No active session. Send a message to start one."` |
+| `/compact` on ended session | Replies `"Could not compact session — it may have already ended."` |
 
 ## Dependencies
 
@@ -217,3 +242,4 @@ Dynamic settings are stored in the `telegram_config` table and can be updated at
 |------|--------|--------|
 | 2026-02-20 | corvid-agent | Initial spec |
 | 2026-03-08 | corvid-agent | Documented `TelegramBridgeMode` type, updated `TelegramBridgeConfig` to include optional `mode` field |
+| 2026-04-30 | corvid-agent | Added `/compact` command, session error/exit handling, subscription cleanup (invariants 16-18) |

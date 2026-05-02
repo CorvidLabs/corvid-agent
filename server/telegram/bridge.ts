@@ -234,11 +234,11 @@ export class TelegramBridge {
       return;
     }
 
-    // Handle /compact command — compact session context
+    // Handle /compact command — compact context for current session
     if (text === '/compact') {
       const sessionId = this.userSessions.get(userId);
       if (!sessionId) {
-        await this.sendText(message.chat.id, 'No active session. Start a conversation first.');
+        await this.sendText(message.chat.id, 'No active session. Send a message to start one.');
         return;
       }
       const compacted = this.processManager.compactSession(sessionId);
@@ -246,10 +246,10 @@ export class TelegramBridge {
         this.userSessions.delete(userId);
         await this.sendText(
           message.chat.id,
-          'Context compacted — session condensed. Send a message to continue with fresh context.',
+          'Context compacted. The session will restart with condensed context on your next message.',
         );
       } else {
-        await this.sendText(message.chat.id, 'No active session process to compact.');
+        await this.sendText(message.chat.id, 'No active session process — it may have already ended.');
       }
       return;
     }
@@ -433,6 +433,11 @@ export class TelegramBridge {
       }
     };
 
+    const cleanup = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      this.processManager.unsubscribe(sessionId, callback);
+    };
+
     const callback: EventCallback = (_sid, event) => {
       if (event.type === 'assistant' && event.message) {
         const content =
@@ -446,48 +451,46 @@ export class TelegramBridge {
         }
       }
 
-      // Process completed
       if (event.type === 'result') {
-        if (debounceTimer) clearTimeout(debounceTimer);
+        cleanup();
         flush();
-        this.processManager.unsubscribe(sessionId, callback);
       }
 
-      if (event.type === 'session_error' || event.type === 'session_exited') {
-        if (debounceTimer) clearTimeout(debounceTimer);
+      if (event.type === 'session_error') {
+        cleanup();
         flush();
+        const errEvent = event as { error?: { errorType?: string; message?: string } };
+        const errorType = errEvent.error?.errorType;
+        const userMessage = this.sessionErrorToText(errorType, errEvent.error?.message);
+        this.sendText(chatId, userMessage, replyTo);
+      }
 
-        if (event.type === 'session_error') {
-          const errEvent = event as { error?: { message?: string; errorType?: string } };
-          const errorType = errEvent.error?.errorType ?? 'unknown';
-          let msg: string;
-          switch (errorType) {
-            case 'context_compacted':
-              msg = 'Context compacted — session condensed. Send a message to continue.';
-              break;
-            case 'context_exhausted':
-              msg = 'Context limit reached — send a message to start a new session.';
-              break;
-            case 'credits_exhausted':
-              msg = 'Credits exhausted — top up credits and send a message to resume.';
-              break;
-            case 'timeout':
-              msg = 'Session timed out — send a message to restart.';
-              break;
-            case 'crash':
-              msg = 'Session crashed — send a message to restart.';
-              break;
-            default:
-              msg = (errEvent.error?.message ?? 'Session error — send a message to restart.').slice(0, 4096);
-          }
-          this.sendText(chatId, msg).catch(() => {});
-        }
-
-        this.processManager.unsubscribe(sessionId, callback);
+      if (event.type === 'session_exited') {
+        cleanup();
+        flush();
       }
     };
 
     this.processManager.subscribe(sessionId, callback);
+  }
+
+  private sessionErrorToText(errorType?: string, fallbackMessage?: string): string {
+    switch (errorType) {
+      case 'context_exhausted':
+        return 'Context limit reached. Send a message to continue with fresh context — the agent will pick up where it left off.';
+      case 'context_compacted':
+        return 'Context compacted — the session will restart with condensed context on your next message.';
+      case 'credits_exhausted':
+        return 'Credits exhausted. Top up credits in the dashboard, then send a message to resume.';
+      case 'timeout':
+        return 'Session timed out. Send a message to restart — try breaking your request into smaller steps.';
+      case 'crash':
+        return 'Session crashed unexpectedly. Send a new message to restart.';
+      case 'spawn_error':
+        return 'Failed to start agent session. Check that the agent provider and API key are configured correctly.';
+      default:
+        return `Session error: ${(fallbackMessage ?? 'Unknown error').slice(0, 500)}`;
+    }
   }
 
   async sendText(chatId: number, text: string, replyTo?: number): Promise<void> {
