@@ -1422,7 +1422,30 @@ export class ProcessManager {
       parts.push('', newPrompt);
     }
 
-    return { prompt: parts.join('\n'), activeTurns };
+    const prompt = parts.join('\n');
+
+    const logLevel = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
+    if (process.env.LOG_TOKEN_BREAKDOWN === 'true' || logLevel === 'debug') {
+      const summaryTokens = meta?.contextSummary ? estimateTokens(meta.contextSummary) : 0;
+      const obsText = observations.map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`).join('\n');
+      const obsTokens = estimateTokens(obsText);
+      const historyText = historyLines.join('\n');
+      const historyTokens = estimateTokens(historyText);
+      const promptTokens = newPrompt ? estimateTokens(newPrompt) : 0;
+      const totalTokens = summaryTokens + obsTokens + historyTokens + promptTokens;
+      const overheadTokens = summaryTokens + obsTokens + historyTokens;
+      const overheadPct = totalTokens > 0 ? Math.round((overheadTokens / totalTokens) * 100) : 0;
+      log.debug(`[session:${session.id}] Resume prompt token breakdown`, {
+        contextSummary: summaryTokens,
+        observations: obsTokens,
+        conversationHistory: historyTokens,
+        userMessage: promptTokens,
+        totalInput: totalTokens,
+        overheadPct: `${overheadPct}%`,
+      });
+    }
+
+    return { prompt, activeTurns };
   }
 
   stopProcess(sessionId: string, reason?: string): void {

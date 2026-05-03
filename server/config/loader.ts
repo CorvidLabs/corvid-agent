@@ -47,7 +47,7 @@ export const CONFIG_DEFAULTS = {
   },
   process: {
     maxTurnsBeforeContextReset: 8,
-    inactivityTimeoutMs: 1_800_000,
+    inactivityTimeoutMs: 7_200_000,
   },
 } as const;
 

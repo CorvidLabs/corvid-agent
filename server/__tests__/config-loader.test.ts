@@ -782,6 +782,6 @@ describe('CONFIG_DEFAULTS', () => {
 
   it('has expected process defaults', () => {
     expect(CONFIG_DEFAULTS.process.maxTurnsBeforeContextReset).toBe(8);
-    expect(CONFIG_DEFAULTS.process.inactivityTimeoutMs).toBe(1_800_000);
+    expect(CONFIG_DEFAULTS.process.inactivityTimeoutMs).toBe(7_200_000);
   });
 });
