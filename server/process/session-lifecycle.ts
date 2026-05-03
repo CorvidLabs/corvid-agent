@@ -100,7 +100,7 @@ export class SessionLifecycleManager {
       .query(`
             SELECT id, pid, name, agent_id, source
             FROM sessions
-            WHERE status = 'running'
+            WHERE status IN ('running', 'waiting')
         `)
       .all() as Array<{ id: string; pid: number | null; name: string; agent_id: string; source: string }>;
 
@@ -321,7 +321,7 @@ export class SessionLifecycleManager {
       .query(`
             SELECT project_id, COUNT(*) as session_count
             FROM sessions
-            WHERE status != 'running'
+            WHERE status NOT IN ('running', 'waiting')
             GROUP BY project_id
             HAVING session_count > ?
         `)
@@ -339,7 +339,7 @@ export class SessionLifecycleManager {
       const oldestSessions = this.db
         .query(`
                 SELECT id FROM sessions
-                WHERE project_id = ? AND status != 'running'
+                WHERE project_id = ? AND status NOT IN ('running', 'waiting')
                 AND updated_at < datetime('now', '-' || ? || ' seconds')
                 ORDER BY updated_at ASC
                 LIMIT ?
@@ -401,7 +401,7 @@ export class SessionLifecycleManager {
   private updateActiveSessionCount(): void {
     this.activeSessionCount = queryCount(
       this.db,
-      "SELECT COUNT(*) as cnt FROM sessions WHERE status IN ('running', 'paused')",
+      "SELECT COUNT(*) as cnt FROM sessions WHERE status IN ('running', 'waiting', 'paused')",
     );
   }
 

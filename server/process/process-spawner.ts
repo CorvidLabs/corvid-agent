@@ -428,11 +428,7 @@ export function releaseEphemeralDir(deps: Pick<ProcessSpawnerDeps, 'ephemeralDir
  *
  * This is a stub for the session keep-alive implementation (#2224).
  */
-export async function warmStartProcess(
-  deps: ProcessSpawnerDeps,
-  session: Session,
-  message: string,
-): Promise<boolean> {
+export async function warmStartProcess(deps: ProcessSpawnerDeps, session: Session, message: string): Promise<boolean> {
   const proc = deps.processes.get(session.id);
   if (!proc) return false;
   if (!proc.isAlive()) return false;

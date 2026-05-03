@@ -63,6 +63,10 @@ const DISCORD_RESTRICTED_MESSAGE_PREFIX = 'Discord message:';
 // refuse to resume — the session is in a death loop.
 const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
 
+// Maximum number of messages to queue while model is responding.
+// When full, sendMessage() returns false (backpressure signal).
+const PROCESS_INPUT_QUEUE_MAX_DEPTH = parseInt(process.env.PROCESS_INPUT_QUEUE_MAX_DEPTH ?? '10', 10);
+
 /** Auto-compact the session when context usage reaches this percentage. */
 const AUTO_COMPACT_THRESHOLD = 90;
 
@@ -176,6 +180,16 @@ export class ProcessManager {
   private ephemeralDirs: Map<string, ResolvedDir> = new Map();
   /** Guard against concurrent resume/start for the same session. */
   private startingSession: Set<string> = new Set();
+  /** Sessions where the model is currently generating a response. */
+  private respondingSessions: Set<string> = new Set();
+  /** Input queue for messages arriving while model is responding. */
+  private inputQueues: Map<
+    string,
+    Array<{
+      content: string | import('@anthropic-ai/sdk/resources/messages/messages').ContentBlockParam[];
+      timestamp: number;
+    }>
+  > = new Map();
   private db: Database;
   readonly approvalManager: ApprovalManager;
   readonly ownerQuestionManager: OwnerQuestionManager;
@@ -303,7 +317,7 @@ export class ProcessManager {
   private cleanupStaleSessions(): void {
     const result = this.db
       .query(
-        `UPDATE sessions SET status = 'idle', pid = NULL, restart_pending = 1 WHERE status IN ('running', 'loading')`,
+        `UPDATE sessions SET status = 'idle', pid = NULL, restart_pending = 1 WHERE status IN ('running', 'loading', 'waiting')`,
       )
       .run();
     if (result.changes > 0) {
@@ -857,6 +871,8 @@ export class ProcessManager {
     updateSessionPid(this.db, session.id, process.pid);
     updateSessionStatus(this.db, session.id, 'running');
     updateSessionTurns(this.db, session.id, resumedTurnCount);
+    // Mark as responding immediately — process is handling the initial prompt
+    this.respondingSessions.add(session.id);
 
     const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as {
       status: string;
@@ -1296,6 +1312,8 @@ export class ProcessManager {
     this.finalizeTokenTracking(sessionId);
     cp.kill();
     this.processes.delete(sessionId);
+    this.respondingSessions.delete(sessionId);
+    this.inputQueues.delete(sessionId);
     updateSessionPid(this.db, sessionId, null);
 
     return true;
@@ -1427,7 +1445,9 @@ export class ProcessManager {
     const logLevel = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
     if (process.env.LOG_TOKEN_BREAKDOWN === 'true' || logLevel === 'debug') {
       const summaryTokens = meta?.contextSummary ? estimateTokens(meta.contextSummary) : 0;
-      const obsText = observations.map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`).join('\n');
+      const obsText = observations
+        .map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`)
+        .join('\n');
       const obsTokens = estimateTokens(obsText);
       const historyText = historyLines.join('\n');
       const historyTokens = estimateTokens(historyText);
@@ -1515,6 +1535,8 @@ export class ProcessManager {
   cleanupSessionState(sessionId: string): void {
     this.startingSession.delete(sessionId);
     this.processes.delete(sessionId);
+    this.respondingSessions.delete(sessionId);
+    this.inputQueues.delete(sessionId);
     this.eventBus.removeSessionSubscribers(sessionId);
     this.finalizeTokenTracking(sessionId);
     this.resilienceManager.deletePausedSession(sessionId);
@@ -1559,12 +1581,12 @@ export class ProcessManager {
     const cp = this.processes.get(sessionId);
     if (!cp) return false;
 
-    const sent = cp.sendMessage(content);
-    if (!sent) {
-      log.warn(`Failed to write to stdin for session ${sessionId}`);
-      // The process can no longer accept input — remove from Map so that
-      // the caller's subsequent resumeProcess() detects the stale state and restarts.
+    // Evict zombie processes immediately
+    if (!cp.isAlive()) {
+      log.warn(`Evicting dead process for session ${sessionId}`);
       this.processes.delete(sessionId);
+      this.respondingSessions.delete(sessionId);
+      this.inputQueues.delete(sessionId);
       return false;
     }
 
@@ -1576,6 +1598,41 @@ export class ProcessManager {
             .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
             .map((b) => b.text)
             .join('\n');
+
+    // If model is currently responding, queue the message for the next turn
+    if (this.respondingSessions.has(sessionId)) {
+      const queue = this.inputQueues.get(sessionId) ?? [];
+      if (queue.length >= PROCESS_INPUT_QUEUE_MAX_DEPTH) {
+        log.warn(`Input queue full for session ${sessionId} (depth=${queue.length}), rejecting message`);
+        return false;
+      }
+      queue.push({ content, timestamp: Date.now() });
+      this.inputQueues.set(sessionId, queue);
+      addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
+      if (textContent) this.recordMessageObservation(sessionId, 'user', textContent);
+      const meta = this.sessionMeta.get(sessionId);
+      if (meta) {
+        meta.turnCount++;
+        updateSessionTurns(this.db, sessionId, meta.turnCount);
+      }
+      incrementSessionCumulativeTurns(this.db, sessionId);
+      log.debug(`Queued message for session ${sessionId} (queue depth: ${queue.length})`);
+      return true;
+    }
+
+    // Process is waiting — send directly (warm turn)
+    const sent = cp.sendMessage(content);
+    if (!sent) {
+      log.warn(`Failed to write to stdin for session ${sessionId}`);
+      // The process can no longer accept input — remove from Map so that
+      // the caller's subsequent resumeProcess() detects the stale state and restarts.
+      this.processes.delete(sessionId);
+      return false;
+    }
+
+    // Mark as responding so concurrent messages get queued
+    this.respondingSessions.add(sessionId);
+
     addSessionMessage(this.db, sessionId, 'user', textContent || '[image attachment(s)]');
     if (textContent) this.recordMessageObservation(sessionId, 'user', textContent);
 
@@ -1587,6 +1644,37 @@ export class ProcessManager {
     incrementSessionCumulativeTurns(this.db, sessionId);
 
     return true;
+  }
+
+  /** Flush the input queue for a session after the model finishes a turn. */
+  private flushInputQueue(sessionId: string): void {
+    const queue = this.inputQueues.get(sessionId);
+    if (!queue || queue.length === 0) {
+      this.inputQueues.delete(sessionId);
+      return;
+    }
+
+    const cp = this.processes.get(sessionId);
+    if (!cp?.isAlive()) {
+      this.inputQueues.delete(sessionId);
+      return;
+    }
+
+    const item = queue.shift();
+    if (!item) return;
+    if (queue.length === 0) this.inputQueues.delete(sessionId);
+
+    const sent = cp.sendMessage(item.content);
+    if (!sent) {
+      log.warn(`Failed to send queued message to session ${sessionId} — evicting process`);
+      this.processes.delete(sessionId);
+      this.inputQueues.delete(sessionId);
+      return;
+    }
+
+    // Mark as responding again for the next turn
+    this.respondingSessions.add(sessionId);
+    log.debug(`Flushed queued message for session ${sessionId} (${queue.length} remaining)`);
   }
 
   isRunning(sessionId: string): boolean {
@@ -1872,6 +1960,16 @@ export class ProcessManager {
       }
     }
 
+    // Model completed a turn: clear responding state, transition to 'waiting' if alive
+    if (event.type === 'result') {
+      this.respondingSessions.delete(sessionId);
+      if (this.processes.has(sessionId)) {
+        updateSessionStatus(this.db, sessionId, 'waiting');
+        // Drain input queue — send next queued message if any
+        this.flushInputQueue(sessionId);
+      }
+    }
+
     this.eventBus.emit(sessionId, event);
   }
 
@@ -1898,6 +1996,8 @@ export class ProcessManager {
       }
       case 'assistant':
       case 'message_start':
+        // Track that the model is actively generating a response
+        this.respondingSessions.add(sessionId);
         status = 'running';
         break;
       case 'result':
@@ -2327,10 +2427,10 @@ export class ProcessManager {
       }
     }
 
-    // Fix DB-level stuck sessions: marked "running" but no live process.
+    // Fix DB-level stuck sessions: marked "running" or "waiting" but no live process.
     // This catches cases where handleExit was never called (crash, OOM, signal).
     const stuckSessions = this.db
-      .query(`SELECT id, pid FROM sessions WHERE status IN ('running', 'loading')`)
+      .query(`SELECT id, pid FROM sessions WHERE status IN ('running', 'loading', 'waiting')`)
       .all() as { id: string; pid: number | null }[];
 
     for (const row of stuckSessions) {
@@ -2345,12 +2445,14 @@ export class ProcessManager {
           cp.kill(); // Ensure the process is fully stopped
           this.processes.delete(row.id);
         }
+        this.respondingSessions.delete(row.id);
+        this.inputQueues.delete(row.id);
         updateSessionStatus(this.db, row.id, 'idle');
         updateSessionPid(this.db, row.id, null);
         this.timerManager.cleanupSession(row.id);
         this.approvalManager.cancelSession(row.id);
         log.warn(
-          `Pruned stuck session ${row.id} (pid=${row.pid}) — ${deadInMap ? 'process dead but still in Map' : 'DB said running but no process exists'}`,
+          `Pruned stuck session ${row.id} (pid=${row.pid}) — ${deadInMap ? 'process dead but still in Map' : 'DB said running/waiting but no process exists'}`,
         );
         pruned++;
       }
