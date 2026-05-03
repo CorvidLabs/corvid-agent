@@ -265,6 +265,338 @@ Side effects on construction:
 | `approvalManager` | `ApprovalManager` | Manages tool approval requests |
 | `ownerQuestionManager` | `OwnerQuestionManager` | Manages owner question flow |
 
+## Process States
+
+### State Diagram
+
+```
+CREATE SESSION
+    ↓
+┌─────────────────────────────────────────────────────┐
+│           IDLE (process killed)                     │
+│  • No process running                               │
+│  • Context in DB (summary + last 20 messages)      │
+│  • State fully reconstructable                      │
+└─────────────────────────────────────────────────────┘
+    │
+    │ startProcess() or resumeProcess()
+    │ [COLD-START: full reconstruction]
+    ↓
+┌─────────────────────────────────────────────────────┐
+│           RUNNING (user initiated)                  │
+│  • Process alive, receiving events                  │
+│  • Responding to initial prompt                     │
+│  • Idle timeout starts: 2h (default)               │
+│  • No input queue (first turn)                      │
+└─────────────────────────────────────────────────────┘
+    │
+    │ [model completes response]
+    ↓
+┌─────────────────────────────────────────────────────┐
+│           RESPONDING                                │
+│  • Process alive, model generating                  │
+│  • Events streamed to subscribers                   │
+│  • Input queue ENABLED (queue messages while)       │
+│  • Timeout continues (idle = no activity)          │
+└─────────────────────────────────────────────────────┘
+    │
+    │ [model completes response, awaits streamInput]
+    ↓
+┌─────────────────────────────────────────────────────┐
+│           WAITING (process alive)                   │
+│  • Process ready to accept next input               │
+│  • Calling streamInput() to receive input          │
+│  • Idle timeout ticking (2h default)               │
+│  • Input queue active if messages queued           │
+│  • Awaits next sendMessage() or timeout            │
+└─────────────────────────────────────────────────────┘
+    │
+    ├─────────────────────────────────────────────────┐
+    │                                                  │
+    │ sendMessage()                  timeout/crash/   │
+    │ → streamInput()                reset → kill     │
+    ↓                                                  ↓
+responding                          IDLE
+(process                          (process
+continues)                        dead)
+```
+
+### State Definitions
+
+| State | Description | Persistence | Lifetime | Transitions |
+|-------|-------------|-------------|----------|------------|
+| `idle` | Process killed, session persisted to DB | DB only | Session lifetime (7 days TTL) | → running (startProcess/resumeProcess) |
+| `running` | Process alive, responding to initial prompt | In-memory process + DB metadata | ~seconds to minutes | → responding (model yields) |
+| `responding` | Process alive, model generating tokens | In-memory process + DB metadata | ~seconds | → waiting (response complete) |
+| `waiting` | Process alive, awaiting next input via streamInput | In-memory process + DB metadata | Timeout (2h default) | → responding (sendMessage) or → idle (timeout/crash) |
+| `error` | Process crashed or unrecoverable error | DB only | Until manual reset or auto-restart | → idle (manual reset or auto-retry) |
+| `paused` | Session paused due to API outage | DB only | Until auto-resume or manual resume | → running (resumeSession) |
+| `stopped` | Session explicitly stopped by user | DB only | Permanent until next startProcess | → idle (on session cleanup) |
+| `completed` | Session finished normally (work task complete) | DB only | 7-day TTL | → cleaned up |
+
+### State Transition Rules
+
+1. **idle → running**: `startProcess()` or `resumeProcess()` called
+2. **running → responding**: Model starts generating (internal SDK/direct-process transition)
+3. **responding → waiting**: Model completes response, calls `streamInput()` (process awaits input)
+4. **waiting → responding**: `sendMessage()` delivered to process via `streamInput()`
+5. **{running|responding|waiting} → error**: Crash detected (via `isAlive()` or exception)
+6. **{running|responding|waiting} → idle**: Timeout (2h) or explicit `stopProcess()`
+7. **any → paused**: API outage detected
+8. **paused → running**: Manual/auto `resumeSession()` called
+9. **any → stopped**: `stopProcess()` called explicitly
+10. **any → completed**: Work task finishes naturally
+
+### Key Properties per State
+
+**Activity Timeout Tracking:**
+- `idle`: No timeout (session dead)
+- `running`: Timeout active from spawn
+- `responding`: Timeout continues (still active session)
+- `waiting`: Timeout continues (activity = awaiting input)
+- `error`: No timeout (will auto-restart or manual intervention)
+- `paused`: No timeout (waiting for API recovery)
+
+**Input Queue:**
+- `idle`: No queue (session not running)
+- `running`: No queue (first response not yet complete)
+- `responding`: Queue enabled (accept messages while responding)
+- `waiting`: Queue enabled (accept future messages)
+- `error`: No queue (process not running)
+- `paused`: No queue (session not active)
+
+**Process Lifetime:**
+- Process exits: `idle`, `stopped`, `completed`
+- Process alive: `running`, `responding`, `waiting`
+- Process may crash in any state; orphan pruner detects and transitions to `error`
+
+## Input Queue Pattern
+
+### Purpose
+
+The input queue enables queueing messages while the model is generating a response. Without queueing, rapid user messages would be rejected or cause race conditions. With queueing, messages are FIFO-ordered and processed one at a time.
+
+### Queue Mechanics
+
+**Structure:**
+```typescript
+interface InputQueueItem {
+  content: string | ContentBlockParam[];
+  timestamp: number; // for ordering verification
+  sendMessageId?: string; // for tracking/debugging
+}
+
+interface InputQueueState {
+  items: InputQueueItem[];
+  maxDepth: number; // configurable, default 10
+  isProcessing: boolean; // true if process is consuming from queue
+}
+```
+
+**Queueing Rules:**
+
+1. **When to queue**: `responding` or `waiting` state
+   - If process is generating (responding) and message arrives: queue it
+   - If process is waiting with inputDone=true and multiple messages arrive: queue them
+
+2. **Queue ordering**: FIFO (First In, First Out) only
+   - Strict ordering: message #3 never processed before message #2
+   - No prioritization (even if marked urgent)
+
+3. **Max queue depth**: 10 items (configurable via env var PROCESS_INPUT_QUEUE_MAX_DEPTH)
+   - When full: `sendMessage()` returns `false` (backpressure signal)
+   - Client responsibility to retry
+
+4. **Dequeue trigger**: Process calls `streamInput()`
+   - Pop from front of queue
+   - Send to process immediately
+   - Mark `isProcessing = true`
+   - After consumed, mark `isProcessing = false` and repeat
+
+5. **Queue clearing**: 
+   - On session exit: purge all queued items
+   - On timeout: purge queue before killing process
+   - On error: purge queue
+
+### Backpressure Handling
+
+**Full Queue Scenario:**
+- User rapidly sends 15 messages while model is responding
+- First 10 are queued successfully
+- 11th returns `sendMessage() = false`
+- Client sees backpressure signal
+- Client should implement exponential backoff and retry
+
+**Expected Behavior:**
+- No message loss (either accepted or rejected synchronously)
+- No silent failure (rejected message signals `false`)
+- No forced drops (queue doesn't drop oldest to make room)
+- Responsibility on client to handle rejection
+
+### Queue State in `waiting` State
+
+```
+WAITING state with input queue example:
+
+sendMessage(msg1) → inputDone=false → streamInput() queued
+sendMessage(msg2) → queue.push(msg2)
+sendMessage(msg3) → queue.push(msg3)
+sendMessage(msg4) → queue.push(msg4)
+
+Queue: [msg2, msg3, msg4]
+Process awaits streamInput callback
+
+Process calls streamInput() → dequeue msg2 → process msg2
+Process calls streamInput() → dequeue msg3 → process msg3
+Process calls streamInput() → dequeue msg4 → process msg4
+Process calls streamInput() → queue empty → wait indefinitely
+```
+
+### Queue Persistence
+
+**Not persisted to DB:**
+- Queue is in-memory only
+- Survives process pause/resume
+- Lost on session exit
+
+**Rationale:**
+- Queue is transient (seconds to minutes at most)
+- DB persistence would add I/O overhead
+- Session summary captures intent; exact queue not needed for recovery
+
+## Cold-start vs Warm-start Paths
+
+### Path Comparison
+
+| Aspect | Cold-start | Warm-start |
+|--------|-----------|-----------|
+| **Trigger** | First message, crash, timeout, reset | Input to `waiting` process |
+| **Context Source** | DB (summary + last 20 msgs) | In-memory (process memory) |
+| **System Prompt** | Full injection | Not re-injected |
+| **Setup Time** | ~500-1000ms (spawn + setup) | ~5-10ms (streamInput call) |
+| **Token Cost** | ~8k tokens (context reconstruction) | ~10-50 tokens (new message) |
+| **Cache State** | Cold (starting fresh) | Hot (persistent) |
+| **Prompt Cache** | Starting from 0 | From previous turns |
+| **Process Lifetime** | Spans session | Spans single turn + waiting |
+
+### Cold-start Triggers
+
+**Mandatory cold-start:**
+1. **First message in session**: No process exists
+2. **Process crash**: `isAlive() === false`
+3. **Idle timeout**: Process killed after 2 hours of inactivity
+4. **Explicit reset**: User runs `/reset` command
+5. **Session error**: Unrecoverable error state
+
+**Optional cold-start (fallback from warm):**
+1. **Context overflow**: Accumulated context > 90% of budget
+2. **Message structure mismatch**: Incompatible content type (rare)
+
+### Cold-start Process
+
+1. Query database for context
+   - Load session.summary (previous conversation summary)
+   - Load last 20 messages from session_messages
+   - Load latest observations (short-term memory)
+
+2. Build system prompt
+   - agent.systemPrompt + agent.appendPrompt
+   - personaPrompt (if agent has persona)
+   - skillPrompt + tool permissions
+   - getMessagingSafetyPrompt()
+   - getResponseRoutingPrompt() (channel affinity)
+   - getProjectContextPrompt(project)
+
+3. Build conversation history block
+   - `<conversation_history>`
+   - Last 20 messages (truncated to 2000 chars each)
+   - `</conversation_history>`
+
+4. Load relevant observations
+   - Query db.recordObservation for observations matching session context
+   - `<relevant_observations>`
+   - Format and inject
+   - `</relevant_observations>`
+
+5. Construct resume prompt
+   - Previous summary + history + observations + new prompt
+   - Append new message from user
+
+6. Spawn fresh process
+   - SDK process: via startSdkProcess(opts)
+   - Direct process: via startDirectProcess(opts)
+
+7. Clear input queue
+
+8. Set status to `running`, start timeout
+
+**Cost Analysis:**
+- System prompt composition: ~50-100ms
+- Database queries: ~50-100ms
+- Context assembly: ~100-200ms
+- Process spawn: ~200-500ms
+- First token latency: ~1-3s (API call)
+- **Total overhead**: ~500-1000ms
+- **Token cost**: ~8000 tokens (system + history)
+- **Prompt cache**: Cold start (no reuse)
+
+### Warm-start Process
+
+1. Verify process alive
+   - Call isAlive() on stored process handle
+   - If false, fallback to cold-start
+
+2. Dequeue next input (if queued)
+   - Pop from inputQueue
+   - If empty, enqueue the new message
+
+3. Send to process via streamInput()
+   - Call q.streamInput(content)
+   - Non-blocking, returns immediately
+   - Process continues from where it left off
+
+4. Process resumes responding
+   - No system prompt re-injection
+   - No context reload
+   - Prompt cache persists
+   - Activity timeout reset
+
+**Cost Analysis:**
+- Process alive check: <1ms
+- Dequeue: <1ms
+- streamInput call: <1ms
+- Process resume: ~10-100ms (depends on model speed)
+- First token latency: ~500ms-3s (model dependent)
+- **Total overhead**: ~5-10ms (just messaging, no setup)
+- **Token cost**: ~10-50 tokens (just new message)
+- **Prompt cache**: Hot (from previous turns, saved in process memory)
+
+### When to Use Each
+
+**Use Cold-start when:**
+- Session is in `idle` state (no process)
+- Process crashed (detected via orphan pruner)
+- Timeout occurred (been waiting >2 hours)
+- User explicitly resets
+- Context overflow detected (append would exceed budget)
+
+**Use Warm-start when:**
+- Process is in `responding` state (model finishing response)
+- Process is in `waiting` state (ready for input)
+- `isAlive()` returns true
+- Input queue has space (< 10 items)
+
+### Fallback Strategy
+
+```
+Try warm-start:
+  1. Is process in waiting state? → No → Cold-start
+  2. Is process alive? → No → Cold-start
+  3. Can append message to context? → No → Cold-start
+  4. Send via streamInput() → Success → Done
+  5. streamInput() fails → Cold-start (error)
+```
+
 ## Invariants
 
 1. **Session-process 1:1 mapping**: At most one process runs per session ID. `startProcess` kills any existing process for that session first
@@ -283,6 +615,12 @@ Side effects on construction:
 13. **Orphan pruning**: Every 5 minutes, removes subscriber/meta entries for sessions with no active process and not paused
 14. **Memory cleanup single source**: `cleanupSessionState` is the single entry point for all cleanup (process, meta, subscribers, paused state, timers, approval/question managers)
 15. **Cursor per-turn metrics**: When the Cursor CLI completes a model turn it emits `result` events that must not be broadcast (Discord and other listeners treat `result` as session end). The manager accepts synthetic `session_turn_metrics` events from `cursor-process` to persist cost and `session_metrics` rows without broadcasting `result`
+16. **Waiting state is not TTL-expirable**: Sessions in `'waiting'` state are protected from automatic TTL expiration (treated like `'running'`). They expire only via the 2-hour idle timeout, not the 7-day session TTL
+17. **Input queue FIFO ordering**: Messages are dequeued in the exact order they were enqueued (first in, first out). No reordering, skipping, or prioritization
+18. **Process lifetime = session lifetime**: A process remains alive from `running` state until `idle` state (timeout, crash, explicit stop). Process is never killed mid-session (except on error)
+19. **Context persists for process lifetime**: Prompt cache and conversation context remain in process memory until session kills the process. Context is NOT reset between `waiting` → `responding` transitions
+20. **Single activity timeout per session**: Only one timeout timer is active per session (not per state). Transitioning between states keeps the same timeout unless extended
+21. **Graceful shutdown saves context**: When timeout fires, context summary is persisted to DB BEFORE process is killed (not after, to avoid loss)
 
 ## Behavioral Examples
 
@@ -328,6 +666,19 @@ Side effects on construction:
 - **When** a cost event fires and `deductTurnCredits` returns `{ success: false }`
 - **Then** a `credits_exhausted` error is emitted and the session is stopped
 
+### Scenario: User sends multiple messages during model response
+
+- **Given** a session in `responding` state (model generating)
+- **When** user sends message #2 while model is still responding
+- **And** then sends message #3 immediately after
+- **Then** message #2 is queued, message #3 is queued
+- **When** model completes response and transitions to `waiting`
+- **And** calls `streamInput()`
+- **Then** message #2 is dequeued and sent to process
+- **And** process resumes responding to message #2
+- **When** process completes message #2 and calls `streamInput()`
+- **Then** message #3 is dequeued and processed
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -340,6 +691,12 @@ Side effects on construction:
 | `resumeSession` for non-paused session | Returns `false` |
 | Max restarts exceeded (3) | Session left in error state, no more retries |
 | Auto-resume max attempts exceeded (10) | Session set to `error`, `auto_resume_exhausted` event emitted |
+| Process stays alive past timeout | Polling fallback kills it on next sweep (60s max delay) |
+| Timeout fires, process already dead | No-op (process map already empty) |
+| Context flush fails on timeout | Log error, still kill process (don't leave zombie) |
+| `extendTimeout` on non-running session | Return `false`, no error event |
+| `extendTimeout` exceeds 4x limit | Clamp to 4x, log info message |
+| Multiple timeout timers for same session | Use SessionTimerManager guard to prevent duplicates |
 
 ## Dependencies
 
@@ -391,9 +748,10 @@ Additionally reads from:
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
-| `AGENT_TIMEOUT_MS` | `1800000` (30 min) | Per-session timeout before forced stop |
+| `AGENT_TIMEOUT_MS` | `7200000` (2 hours) | Per-session idle timeout before forced stop (updated for keep-alive architecture) |
 | `COUNCIL_MODEL` | (none) | Model override for council chairman sessions |
 | `OLLAMA_USE_CLAUDE_PROXY` | `"false"` | When `"true"`, Ollama agents route through SDK (Claude Code) for better tool/reasoning support |
+| `PROCESS_INPUT_QUEUE_MAX_DEPTH` | `10` | Maximum number of queued messages while process is responding (for keep-alive) |
 
 Internal constants (not env-configurable):
 
@@ -410,6 +768,10 @@ Internal constants (not env-configurable):
 | `MAX_TURNS_BEFORE_CONTEXT_RESET` | `40` | Turns before killing for context reset |
 | `ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD` | `3` | Consecutive zero-turn completions before refusing to resume |
 | `DISCORD_RESTRICTED_MESSAGE_PREFIX` | `'Discord message:'` | Session name prefix for restricted Discord `/message` sessions |
+| `TIMEOUT_CHECK_INTERVAL_MS` | `60000` | Polling interval for timeout fallback checker (60s) |
+| `MIN_TIMEOUT_MS` | `60000` | Minimum configurable timeout (safety floor, 60s) |
+| `MAX_TIMEOUT_MS` | `86400000` | Maximum configurable timeout (24 hours) |
+| `TIMEOUT_EXTENSION_MAX_MULTIPLIER` | `4` | Max extension factor for `extendTimeout` (4x default) |
 
 ## Change Log
 
@@ -425,3 +787,4 @@ Internal constants (not env-configurable):
 | 2026-04-16 | corvid-agent | Document McpServiceContainer methods/isAvailable, full McpServices/BuildContextOptions fields, startStartupTimeout/clearStartupTimeout, fix applyCostUpdate return type (boolean), fix sendMessage signature (ContentBlockParam[]), add flushActiveSessionSummaries, fix getStats to include startupTimeouts, inline EventHandlerDeps/ExitHandlerDeps fields, remove RoutingDecision duplicate, collapse exported-types table with Source column (#2022) |
 | 2026-04-20 | corvid-agent | Add approval-flow.ts (approval request/response bridge) and persona-injector.ts (persona+skill injection facade); add session-lifecycle.ts to files list; document new exported functions |
 | 2026-04-22 | corvid-agent | Add `isAlive()` to `SdkProcess` interface; sendMessage evicts zombie processes from Map; orphan pruner detects dead-in-Map processes via `isAlive()` (#2127) |
+| 2026-05-02 | corvid-agent | Add session keep-alive architecture: process states (idle, running, responding, waiting), input queue pattern (FIFO, backpressure), cold-start vs warm-start paths, increase default timeout to 2 hours (from 30 min), document graceful shutdown behavior (#2223) |
