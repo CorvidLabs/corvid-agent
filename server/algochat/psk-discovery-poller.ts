@@ -211,7 +211,12 @@ export class PSKDiscoveryPoller {
               }
 
               break;
-            } catch {}
+            } catch (err) {
+              log.debug('PSK trial-decrypt failed (expected for wrong PSK)', {
+                contactId: contact.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
           }
         }
       } while (nextToken);
