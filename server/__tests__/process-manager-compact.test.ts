@@ -219,6 +219,8 @@ describe('auto-compact on context_usage event', () => {
       type: 'context_usage',
       session_id: sessionId,
       usagePercent: 92,
+      estimatedTokens: 184000,
+      contextWindow: 200000,
     } as unknown as ClaudeStreamEvent;
 
     (pm as any).handleEvent(sessionId, event);
@@ -238,6 +240,8 @@ describe('auto-compact on context_usage event', () => {
       type: 'context_usage',
       session_id: sessionId,
       usagePercent: 85,
+      estimatedTokens: 170000,
+      contextWindow: 200000,
     } as unknown as ClaudeStreamEvent;
 
     (pm as any).handleEvent(sessionId, event);
@@ -257,6 +261,8 @@ describe('auto-compact on context_usage event', () => {
       type: 'context_usage',
       session_id: sessionId,
       usagePercent: 75,
+      estimatedTokens: 150000,
+      contextWindow: 200000,
     } as unknown as ClaudeStreamEvent;
 
     (pm as any).handleEvent(sessionId, event);
@@ -277,6 +283,8 @@ describe('auto-compact on context_usage event', () => {
       type: 'context_usage',
       session_id: sessionId,
       usagePercent: 90,
+      estimatedTokens: 180000,
+      contextWindow: 200000,
     } as unknown as ClaudeStreamEvent;
 
     (pm as any).handleEvent(sessionId, event);
