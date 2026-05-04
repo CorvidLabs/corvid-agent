@@ -741,16 +741,16 @@ describe('MessageQueue', () => {
     const q = new MessageQueue();
 
     q.enqueue(makeUserMsg('1'));
-    expect((await q.next()).value.message.content).toBe('1');
+    expect((await q.next()).value!.message.content).toBe('1');
 
     q.enqueue(makeUserMsg('2'));
     q.enqueue(makeUserMsg('3'));
-    expect((await q.next()).value.message.content).toBe('2');
-    expect((await q.next()).value.message.content).toBe('3');
+    expect((await q.next()).value!.message.content).toBe('2');
+    expect((await q.next()).value!.message.content).toBe('3');
 
     const pending = q.next();
     q.enqueue(makeUserMsg('4'));
-    expect((await pending).value.message.content).toBe('4');
+    expect((await pending).value!.message.content).toBe('4');
   });
 
   test('multiple close calls do not throw', () => {

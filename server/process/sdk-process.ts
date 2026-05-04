@@ -26,14 +26,10 @@ import type { ClaudeStreamEvent } from './types';
 
 const log = createLogger('SdkProcess');
 
-/**
- * Persistent async iterable message queue for keep-alive sessions.
- * Stays open until explicitly closed, preventing the SDK from calling
- * endInput() on the CLI process stdin.
- */
-export class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterator<SDKUserMessage> {
+/** Single-consumer async message queue for keep-alive sessions. */
+export class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterator<SDKUserMessage, undefined> {
   private queue: SDKUserMessage[] = [];
-  private waiting: ((result: IteratorResult<SDKUserMessage>) => void) | null = null;
+  private waiting: ((result: IteratorResult<SDKUserMessage, undefined>) => void) | null = null;
   private closed = false;
 
   enqueue(msg: SDKUserMessage): void {
@@ -52,23 +48,23 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterato
     if (this.waiting) {
       const resolve = this.waiting;
       this.waiting = null;
-      resolve({ done: true, value: undefined as unknown as SDKUserMessage });
+      resolve({ done: true, value: undefined });
     }
   }
 
-  next(): Promise<IteratorResult<SDKUserMessage>> {
+  next(): Promise<IteratorResult<SDKUserMessage, undefined>> {
     if (this.queue.length > 0) {
       return Promise.resolve({ done: false, value: this.queue.shift()! });
     }
     if (this.closed) {
-      return Promise.resolve({ done: true, value: undefined as unknown as SDKUserMessage });
+      return Promise.resolve({ done: true, value: undefined });
     }
     return new Promise((resolve) => {
       this.waiting = resolve;
     });
   }
 
-  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage, undefined> {
     return this;
   }
 }

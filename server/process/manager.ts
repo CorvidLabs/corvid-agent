@@ -643,6 +643,7 @@ export class ProcessManager {
     // Skip external MCP for restricted sessions unless MCP allow list is explicitly set
     const externalMcpConfigs = skipMcp ? [] : session.agentId ? getActiveServersForAgent(this.db, session.agentId) : [];
 
+    const isKeepAlive = session.keepAlive || KEEP_ALIVE_ENABLED;
     let sp: SdkProcess;
     try {
       sp = startSdkProcess({
@@ -661,8 +662,8 @@ export class ProcessManager {
         skillPrompt: config.skillPrompt,
         conversationOnly: isNoTools || conversationOnly,
         toolAllowList: isRestrictedTools ? toolAllowList : undefined,
-        keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
-        onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+        keepAlive: isKeepAlive,
+        onTurnComplete: isKeepAlive ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1163,6 +1164,7 @@ export class ProcessManager {
     //   anything else           → full tools (admin /message + normal sessions)
     const isRestrictedMessage = this.isRestrictedDiscordMessageSession(session.name);
     const isConversationOnly = false; // /message sessions always get at least memory + read tools now
+    const isKeepAlive = session.keepAlive || KEEP_ALIVE_ENABLED;
     const resumeToolAllowList = isRestrictedMessage ? ['Read', 'Glob', 'Grep'] : undefined;
     const resumeMcpToolAllowList = isRestrictedMessage
       ? ['corvid_recall_memory', 'corvid_read_on_chain_memories']
@@ -1252,8 +1254,8 @@ export class ProcessManager {
           externalMcpConfigs: resumeExternalMcpConfigs,
           conversationOnly: isConversationOnly,
           toolAllowList: resumeToolAllowList,
-          keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
-          onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+          keepAlive: isKeepAlive,
+          onTurnComplete: isKeepAlive ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
         });
       }
     } catch (err) {
