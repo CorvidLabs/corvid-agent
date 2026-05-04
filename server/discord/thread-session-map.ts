@@ -38,6 +38,8 @@ export interface ThreadSessionInfo {
 export interface ThreadCallbackInfo {
   sessionId: string;
   callback: EventCallback;
+  /** Clean up timers and buffered state when replacing this subscription. */
+  dispose?: () => void;
 }
 
 /**
