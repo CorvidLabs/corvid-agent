@@ -98,6 +98,12 @@ export function isApiError(error: string): boolean {
   return false;
 }
 
+export interface TurnCompleteMetrics {
+  totalCostUsd: number;
+  durationMs: number;
+  numTurns: number;
+}
+
 export interface SdkProcessOptions {
   session: Session;
   project: Project;
@@ -119,6 +125,10 @@ export interface SdkProcessOptions {
   conversationOnly?: boolean;
   /** When provided, only these built-in tools are allowed — all others are disallowed. */
   toolAllowList?: string[];
+  /** When true, process enters warm state after each model turn instead of exiting. */
+  keepAlive?: boolean;
+  /** Fires when model finishes a turn but process stays alive (keepAlive mode only). */
+  onTurnComplete?: (metrics: TurnCompleteMetrics) => void;
 }
 
 /** All built-in Claude Code tools that must be blocked in conversation-only mode. */
@@ -155,6 +165,8 @@ export interface SdkProcess {
   kill: () => void;
   /** Returns true if the process can still accept and process messages. */
   isAlive: () => boolean;
+  /** Returns true if the process completed a turn and is idle waiting for streamInput(). */
+  isWarm: () => boolean;
 }
 
 let nextPseudoPid = 900_000;
@@ -176,11 +188,14 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     skillPrompt,
     conversationOnly,
     toolAllowList,
+    keepAlive,
+    onTurnComplete,
   } = options;
 
   const abortController = new AbortController();
   const pseudoPid = nextPseudoPid++;
   let inputDone = false;
+  let warm = false;
 
   const canUseTool: CanUseTool = async (toolName, input, _opts) => {
     // Protected path check — runs BEFORE bypass modes so even full-auto agents are blocked
@@ -470,12 +485,30 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         if (event) {
           onEvent(event);
         }
+
+        // Keep-alive turn boundary: when keepAlive is enabled and model finishes a turn,
+        // transition to warm state instead of exiting. The async iterator stays open
+        // waiting for streamInput() to feed a new user message.
+        if (message.type === 'result' && keepAlive) {
+          warm = true;
+          log.info(`SDK process entering warm state for session ${session.id}`, { pid: pseudoPid });
+          if (onTurnComplete) {
+            const result = message as import('@anthropic-ai/claude-agent-sdk').SDKResultMessage;
+            onTurnComplete({
+              totalCostUsd: result.total_cost_usd ?? 0,
+              durationMs: result.duration_ms ?? 0,
+              numTurns: result.num_turns ?? 0,
+            });
+          }
+        }
       }
       if (messageCount === 0) {
         log.warn(`SDK query completed with 0 messages for session ${session.id}`, { prompt: prompt.slice(0, 100) });
       }
+      warm = false;
       onExit(0);
     } catch (err) {
+      warm = false;
       if (err instanceof Error && err.name === 'AbortError') {
         onExit(0);
         return;
@@ -504,6 +537,7 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
       onExit(1, errorMsg);
     } finally {
       inputDone = true;
+      warm = false;
     }
   })();
 
@@ -515,6 +549,12 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
         `sendMessage rejected for session ${session.id}: inputDone=${inputDone}, aborted=${abortController.signal.aborted}`,
       );
       return false;
+    }
+
+    const wasWarm = warm;
+    if (warm) {
+      warm = false; // Transition from warm → processing
+      log.info(`SDK process transitioning warm → processing for session ${session.id}`, { pid: pseudoPid });
     }
 
     const isMultimodal = Array.isArray(content);
@@ -539,7 +579,12 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
       log.warn(`streamInput failed for session ${session.id}`, {
         error: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
+        wasWarm,
       });
+      // If streamInput fails on a warm process, mark as done so caller falls back to cold start
+      if (wasWarm) {
+        inputDone = true;
+      }
     });
 
     return true;
@@ -555,7 +600,11 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     return !inputDone && !abortController.signal.aborted;
   }
 
-  return { pid: pseudoPid, sendMessage, kill, isAlive };
+  function isWarm(): boolean {
+    return warm && !inputDone && !abortController.signal.aborted;
+  }
+
+  return { pid: pseudoPid, sendMessage, kill, isAlive, isWarm };
 }
 
 /**

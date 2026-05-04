@@ -24,7 +24,7 @@ import type { ApprovalManager } from './approval-manager';
 import type { ApprovalRequestWire } from './approval-types';
 import { startDirectProcess } from './direct-process';
 import { resolveDirectToolAllowList } from './provider-routing';
-import type { SdkProcess } from './sdk-process';
+import type { SdkProcess, TurnCompleteMetrics } from './sdk-process';
 import { startSdkProcess } from './sdk-process';
 import { resolveSessionConfig } from './session-config-resolver';
 import type { SessionTimerManager } from './session-timer-manager';
@@ -59,6 +59,7 @@ export interface ProcessSpawnerDeps {
   onExit: (sessionId: string, code: number | null, errorMessage?: string) => void;
   onApprovalRequest: (sessionId: string, request: ApprovalRequestWire) => void;
   onApiOutage: (sessionId: string) => void;
+  onTurnComplete: (sessionId: string, metrics: TurnCompleteMetrics) => void;
   emitToSession: (sessionId: string, event: ClaudeStreamEvent) => void;
   extendTimeout: (sessionId: string, additionalMs: number) => boolean;
   buildMcpContext: (
@@ -80,6 +81,8 @@ export interface SpawnOptions {
   conversationOnly?: boolean;
   toolAllowList?: string[];
   mcpToolAllowList?: string[];
+  /** When true, SDK process enters warm state after each model turn instead of exiting. */
+  keepAlive?: boolean;
 }
 
 /**
@@ -150,7 +153,8 @@ export function spawnSdkProcess(
   prompt: string,
   options: SpawnOptions = {},
 ): void {
-  const { depth, schedulerMode, schedulerActionType, conversationOnly, toolAllowList, mcpToolAllowList } = options;
+  const { depth, schedulerMode, schedulerActionType, conversationOnly, toolAllowList, mcpToolAllowList, keepAlive } =
+    options;
   const effectiveProject = session.workDir ? { ...project, workingDir: session.workDir } : project;
   const config = resolveSessionConfig(deps.db, agent, session.agentId, session.projectId);
 
@@ -198,6 +202,8 @@ export function spawnSdkProcess(
       skillPrompt: config.skillPrompt,
       conversationOnly: isNoTools || conversationOnly,
       toolAllowList: isRestrictedTools ? toolAllowList : undefined,
+      keepAlive,
+      onTurnComplete: keepAlive ? (metrics) => deps.onTurnComplete(session.id, metrics) : undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -42,7 +42,7 @@ import { startDirectProcess, summarizeConversation } from './direct-process';
 import { SessionEventBus } from './event-bus';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { OwnerQuestionManager } from './owner-question-manager';
-import { type SdkProcess, startSdkProcess } from './sdk-process';
+import { type SdkProcess, type TurnCompleteMetrics, startSdkProcess } from './sdk-process';
 import { resolveSessionConfig } from './session-config-resolver';
 import { MAX_RESTARTS, SessionResilienceManager } from './session-resilience-manager';
 import { SessionTimerManager } from './session-timer-manager';
@@ -65,6 +65,12 @@ const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
 
 /** Auto-compact the session when context usage reaches this percentage. */
 const AUTO_COMPACT_THRESHOLD = 90;
+
+/** Keep-alive TTL default in ms. Configurable via KEEP_ALIVE_TTL_MS env var. */
+const KEEP_ALIVE_TTL_MS = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10);
+
+/** Whether keep-alive is globally enabled. Opt-in via KEEP_ALIVE_ENABLED env var. */
+const KEEP_ALIVE_ENABLED = process.env.KEEP_ALIVE_ENABLED === 'true';
 
 /** Result of a provider routing decision — exported for testing. */
 export interface RoutingDecision {
@@ -227,6 +233,10 @@ export class ProcessManager {
           'Session timed out waiting for the model to respond. The model endpoint may be down or overloaded. Try again or use a different agent.',
         );
         this.stopProcess(sessionId, 'startup_timeout');
+      },
+      onKeepAliveExpiry: (sessionId) => {
+        log.info(`Keep-alive TTL expired for session ${sessionId} — killing warm process`);
+        this.stopProcess(sessionId, 'keep_alive_ttl_expired');
       },
       isRunning: (sessionId) => this.processes.has(sessionId),
       getLastActivityAt: (sessionId) => this.sessionMeta.get(sessionId)?.lastActivityAt,
@@ -962,10 +972,35 @@ export class ProcessManager {
     }
 
     if (this.processes.has(session.id)) {
-      if (prompt) {
-        this.sendMessage(session.id, prompt);
+      const proc = this.processes.get(session.id)!;
+      if (proc.isAlive()) {
+        if (prompt) {
+          const sent = this.sendMessage(session.id, prompt);
+          if (sent) {
+            // Warm path succeeded — reset keep-alive TTL
+            if (proc.isWarm()) {
+              this.timerManager.clearKeepAliveTtl(session.id);
+            }
+            return;
+          }
+          // Warm path sendMessage failed — fall through to cold-start
+          log.warn(`Warm path sendMessage failed for session ${session.id} — falling through to cold start`);
+          this.eventBus.emit(session.id, {
+            type: 'system',
+            subtype: 'warm_path_failed',
+            message: { content: 'Warm path failed, falling back to cold start' },
+          } as ClaudeStreamEvent);
+          this.processes.delete(session.id);
+          this.timerManager.clearKeepAliveTtl(session.id);
+          // Fall through to cold-start below
+        } else {
+          return; // No prompt, process is alive — nothing to do
+        }
+      } else {
+        // Process is in the map but dead — clean up and fall through to cold-start
+        this.processes.delete(session.id);
+        this.timerManager.clearKeepAliveTtl(session.id);
       }
-      return;
     }
 
     // Circuit breaker: detect zero-turn death loops.
@@ -1215,6 +1250,8 @@ export class ProcessManager {
           externalMcpConfigs: resumeExternalMcpConfigs,
           conversationOnly: isConversationOnly,
           toolAllowList: resumeToolAllowList,
+          keepAlive: KEEP_ALIVE_ENABLED,
+          onTurnComplete: KEEP_ALIVE_ENABLED ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
         });
       }
     } catch (err) {
@@ -1427,7 +1464,9 @@ export class ProcessManager {
     const logLevel = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
     if (process.env.LOG_TOKEN_BREAKDOWN === 'true' || logLevel === 'debug') {
       const summaryTokens = meta?.contextSummary ? estimateTokens(meta.contextSummary) : 0;
-      const obsText = observations.map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`).join('\n');
+      const obsText = observations
+        .map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`)
+        .join('\n');
       const obsTokens = estimateTokens(obsText);
       const historyText = historyLines.join('\n');
       const historyTokens = estimateTokens(historyText);
@@ -1529,21 +1568,29 @@ export class ProcessManager {
    */
   getMemoryStats(): {
     processes: number;
+    warmProcesses: number;
     subscribers: number;
     sessionMeta: number;
     pausedSessions: number;
     sessionTimeouts: number;
     stableTimers: number;
+    keepAliveTimers: number;
     globalSubscribers: number;
   } {
     const timerStats = this.timerManager.getStats();
+    let warmCount = 0;
+    for (const proc of this.processes.values()) {
+      if (proc.isWarm()) warmCount++;
+    }
     return {
       processes: this.processes.size,
+      warmProcesses: warmCount,
       subscribers: this.eventBus.getSubscriberCount(),
       sessionMeta: this.sessionMeta.size,
       pausedSessions: this.resilienceManager.pausedSessionCount,
       sessionTimeouts: timerStats.sessionTimeouts,
       stableTimers: timerStats.stableTimers,
+      keepAliveTimers: timerStats.keepAliveTimers,
       globalSubscribers: this.eventBus.getGlobalSubscriberCount(),
     };
   }
@@ -1559,13 +1606,22 @@ export class ProcessManager {
     const cp = this.processes.get(sessionId);
     if (!cp) return false;
 
+    const wasWarm = cp.isWarm();
     const sent = cp.sendMessage(content);
     if (!sent) {
-      log.warn(`Failed to write to stdin for session ${sessionId}`);
+      log.warn(`Failed to write to stdin for session ${sessionId}`, { wasWarm });
       // The process can no longer accept input — remove from Map so that
       // the caller's subsequent resumeProcess() detects the stale state and restarts.
       this.processes.delete(sessionId);
+      this.timerManager.clearKeepAliveTtl(sessionId);
       return false;
+    }
+
+    // Reset keep-alive TTL on successful message delivery to warm process
+    if (wasWarm) {
+      this.timerManager.clearKeepAliveTtl(sessionId);
+      // Restart normal session inactivity timeout since process is now active
+      this.timerManager.startSessionTimeout(sessionId);
     }
 
     // Persist as text for session history (extract text from multimodal content)
@@ -1582,6 +1638,7 @@ export class ProcessManager {
     const meta = this.sessionMeta.get(sessionId);
     if (meta) {
       meta.turnCount++;
+      meta.lastActivityAt = Date.now();
       updateSessionTurns(this.db, sessionId, meta.turnCount);
     }
     incrementSessionCumulativeTurns(this.db, sessionId);
@@ -2035,6 +2092,30 @@ export class ProcessManager {
     } else {
       this.cleanupSessionState(sessionId);
     }
+  }
+
+  /**
+   * Handle keep-alive turn completion. Process enters warm state — start TTL
+   * timer and clear the normal session inactivity timeout.
+   */
+  private handleTurnComplete(sessionId: string, metrics: TurnCompleteMetrics): void {
+    log.info(`Session ${sessionId} turn complete — process entering warm state`, {
+      costUsd: metrics.totalCostUsd,
+      durationMs: metrics.durationMs,
+      numTurns: metrics.numTurns,
+    });
+
+    // Start keep-alive TTL — process will be killed if no new message arrives
+    this.timerManager.startKeepAliveTtl(sessionId, KEEP_ALIVE_TTL_MS);
+
+    // Clear the normal inactivity timeout — warm processes use keep-alive TTL instead
+    this.timerManager.clearSessionTimeout(sessionId);
+
+    this.eventBus.emit(sessionId, {
+      type: 'system',
+      subtype: 'turn_complete',
+      message: { content: JSON.stringify({ warm: true, ...metrics }) },
+    } as ClaudeStreamEvent);
   }
 
   /**

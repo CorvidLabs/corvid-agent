@@ -1164,7 +1164,11 @@ export function startDirectProcess(options: DirectProcessOptions): SdkProcess {
     return !aborted;
   }
 
-  return { pid: pseudoPid, sendMessage, kill, isAlive };
+  function isWarm(): boolean {
+    return false; // Direct processes do not support keep-alive
+  }
+
+  return { pid: pseudoPid, sendMessage, kill, isAlive, isWarm };
 }
 
 // ── Nudge system ──────────────────────────────────────────────────────────

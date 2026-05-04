@@ -51,11 +51,13 @@ function createMockProcessManager(): ProcessManager {
     unsubscribeAll: mock(() => {}),
     getMemoryStats: mock(() => ({
       processes: 0,
+      warmProcesses: 0,
       subscribers: 0,
       sessionMeta: 0,
       pausedSessions: 0,
       sessionTimeouts: 0,
       stableTimers: 0,
+      keepAliveTimers: 0,
       globalSubscribers: 0,
     })),
     cleanupSessionState: mock(() => {}),

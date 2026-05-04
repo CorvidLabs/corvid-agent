@@ -18,6 +18,7 @@ function makeMockProcess(sendResult: boolean = true): SdkProcess {
     sendMessage: () => sendResult,
     kill: () => {},
     isAlive: () => true,
+    isWarm: () => false,
   };
 }
 

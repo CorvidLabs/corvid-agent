@@ -430,7 +430,11 @@ export function spawnCursorProcess(options: CursorProcessOptions): SdkProcess {
     return !killed;
   }
 
-  return { pid, sendMessage, kill, isAlive };
+  function isWarm(): boolean {
+    return false; // Cursor processes do not support keep-alive
+  }
+
+  return { pid, sendMessage, kill, isAlive, isWarm };
 }
 
 export function buildArgs(project: Project, agent: Agent | null, worktree?: string, worktreeBase?: string): string[] {
