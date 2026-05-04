@@ -253,6 +253,39 @@ export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: num
   ).run(microAlgos, id);
 }
 
+export function setDurationCheckpoint(db: Database, id: string, timestampMs: number): void {
+  db.query('UPDATE sessions SET duration_checkpoint = ? WHERE id = ?').run(timestampMs, id);
+}
+
+export function accumulateActiveDuration(db: Database, id: string): void {
+  const now = Date.now();
+  db.query(
+    `UPDATE sessions SET active_duration_ms = active_duration_ms + COALESCE(? - duration_checkpoint, 0),
+     duration_checkpoint = ?, updated_at = datetime('now')
+     WHERE id = ? AND duration_checkpoint IS NOT NULL`,
+  ).run(now, now, id);
+}
+
+export function finalizeActiveDuration(db: Database, id: string): void {
+  const now = Date.now();
+  db.query(
+    `UPDATE sessions SET active_duration_ms = active_duration_ms + COALESCE(? - duration_checkpoint, 0),
+     duration_checkpoint = NULL, updated_at = datetime('now')
+     WHERE id = ? AND duration_checkpoint IS NOT NULL`,
+  ).run(now, id);
+}
+
+export function getSessionActiveDurationMs(db: Database, id: string): number {
+  const row = db
+    .query<{ active_duration_ms: number; duration_checkpoint: number | null }, [string]>(
+      'SELECT active_duration_ms, duration_checkpoint FROM sessions WHERE id = ?',
+    )
+    .get(id);
+  if (!row) return 0;
+  const extra = row.duration_checkpoint ? Date.now() - row.duration_checkpoint : 0;
+  return row.active_duration_ms + extra;
+}
+
 export function updateSessionSummary(db: Database, id: string, summary: string): void {
   db.query("UPDATE sessions SET conversation_summary = ?, updated_at = datetime('now') WHERE id = ?").run(summary, id);
 }
