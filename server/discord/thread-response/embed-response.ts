@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { getSessionActiveDurationMs, getSessionCumulativeTurns, getSessionTurns } from '../../db/sessions';
+import { getSession, getSessionActiveDurationMs, getSessionCumulativeTurns, getSessionTurns } from '../../db/sessions';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
 import { createLogger } from '../../lib/logger';
 import type { EventCallback } from '../../process/interfaces';
@@ -8,12 +8,12 @@ import { extractContentImageUrls, extractContentText } from '../../process/types
 import {
   agentColor,
   type ContextUsage,
-  collapseCodeBlocks,
   CorvidEmbed,
+  collapseCodeBlocks,
   type DiscordFileAttachment,
   type EmbedAgentIdentity,
-  type FooterContext,
   editEmbed,
+  type FooterContext,
   hexColorToInt,
   sendEmbed,
   sendEmbedWithButtons,
@@ -66,6 +66,14 @@ export function subscribeForResponseWithEmbed(
   let sentErrorMessage = false; // dedup: prevent repeated error messages for same session
   const startTime = Date.now();
   let latestContextUsage: ContextUsage | undefined;
+  const existingSession = getSession(db, sessionId);
+  if (existingSession?.lastContextTokens && existingSession.lastContextWindow) {
+    latestContextUsage = {
+      estimatedTokens: existingSession.lastContextTokens,
+      contextWindow: existingSession.lastContextWindow,
+      usagePercent: Math.round((existingSession.lastContextTokens / existingSession.lastContextWindow) * 100),
+    };
+  }
 
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
   const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName };
@@ -110,7 +118,9 @@ export function subscribeForResponseWithEmbed(
       return;
     }
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    updateProgressEmbed(CorvidEmbed.toolStatus(`Still working (${elapsed}s elapsed)...`, footerCtx, authorIdentity)).catch((err) => {
+    updateProgressEmbed(
+      CorvidEmbed.toolStatus(`Still working (${elapsed}s elapsed)...`, footerCtx, authorIdentity),
+    ).catch((err) => {
       log.debug('Progress embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
     });
   }, PROGRESS_INTERVAL_MS);
@@ -311,11 +321,15 @@ export function subscribeForResponseWithEmbed(
     if (event.type === 'context_usage') {
       const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
       if (usage.estimatedTokens != null && usage.contextWindow != null && usage.usagePercent != null) {
-        latestContextUsage = {
-          estimatedTokens: usage.estimatedTokens,
-          contextWindow: usage.contextWindow,
-          usagePercent: usage.usagePercent,
-        };
+        // Skip premature SDK readings (e.g., 79 tokens before full context loads).
+        // Real sessions always exceed 1000 tokens from system prompt alone.
+        if (usage.estimatedTokens >= 1000) {
+          latestContextUsage = {
+            estimatedTokens: usage.estimatedTokens,
+            contextWindow: usage.contextWindow,
+            usagePercent: usage.usagePercent,
+          };
+        }
       }
     }
 
