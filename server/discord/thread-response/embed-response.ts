@@ -369,16 +369,23 @@ export function subscribeForResponseWithEmbed(
 
       if (isKeepAlive) {
         // Keep-alive turn complete: show warm status with TTL, stay subscribed for future turns
+        const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(2 * 60 * 60 * 1000), 10);
+        const expiresAt = Math.floor((Date.now() + ttlMs) / 1000);
+        const dt = getTurnInfo();
+        const warmBuilder = CorvidEmbed.warm(footerCtx, authorIdentity, expiresAt);
+        if (latestContextUsage) warmBuilder.withContextUsage(latestContextUsage);
+        warmBuilder.withTurns(dt.active, dt.cumulative);
+        const { embed: warmEmbed } = warmBuilder.build();
         if (progressMessageId) {
-          const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(2 * 60 * 60 * 1000), 10);
-          const expiresAt = Math.floor((Date.now() + ttlMs) / 1000);
-          const dt = getTurnInfo();
-          const warmBuilder = CorvidEmbed.warm(footerCtx, authorIdentity, expiresAt);
-          if (latestContextUsage) warmBuilder.withContextUsage(latestContextUsage);
-          warmBuilder.withTurns(dt.active, dt.cumulative);
-          const { embed: warmEmbed } = warmBuilder.build();
           editEmbed(delivery, botToken, threadId, progressMessageId, warmEmbed).catch((err) => {
             log.debug('Progress warm edit failed', {
+              threadId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        } else {
+          sendEmbed(delivery, botToken, threadId, warmEmbed).catch((err) => {
+            log.debug('Warm embed send failed', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
             });
