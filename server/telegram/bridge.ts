@@ -44,6 +44,10 @@ export class TelegramBridge {
   // Map Telegram userId → active sessionId
   private userSessions: Map<number, string> = new Map();
 
+  // Track active response subscriptions: sessionId → EventCallback
+  // Used to dedup subscriptions on keep-alive re-messages and clean up on session exit.
+  private sessionCallbacks: Map<string, EventCallback> = new Map();
+
   // Per-user rate limiting: userId → timestamps of recent messages
   private userMessageTimestamps: Map<number, number[]> = new Map();
   private readonly RATE_LIMIT_WINDOW_MS = 60_000;
@@ -409,6 +413,13 @@ export class TelegramBridge {
   }
 
   private subscribeForResponse(sessionId: string, chatId: number, replyTo?: number): void {
+    // Dedup: replace existing subscription to prevent duplicate responses on keep-alive re-messages.
+    const existing = this.sessionCallbacks.get(sessionId);
+    if (existing) {
+      this.processManager.unsubscribe(sessionId, existing);
+      this.sessionCallbacks.delete(sessionId);
+    }
+
     let buffer = '';
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -436,6 +447,7 @@ export class TelegramBridge {
     const cleanup = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       this.processManager.unsubscribe(sessionId, callback);
+      this.sessionCallbacks.delete(sessionId);
     };
 
     const callback: EventCallback = (_sid, event) => {
@@ -452,8 +464,18 @@ export class TelegramBridge {
       }
 
       if (event.type === 'result') {
-        cleanup();
-        flush();
+        // Check if keep-alive is enabled — warm turn complete, stay subscribed for the next turn
+        const kaRow = this.db
+          .query<{ keep_alive: number }, [string]>('SELECT keep_alive FROM sessions WHERE id = ?')
+          .get(sessionId);
+        if (kaRow?.keep_alive === 1) {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = null;
+          void flush();
+        } else {
+          cleanup();
+          flush();
+        }
       }
 
       if (event.type === 'session_error') {
@@ -471,6 +493,7 @@ export class TelegramBridge {
       }
     };
 
+    this.sessionCallbacks.set(sessionId, callback);
     this.processManager.subscribe(sessionId, callback);
   }
 

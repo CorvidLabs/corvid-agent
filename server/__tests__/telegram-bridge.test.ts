@@ -20,6 +20,7 @@ interface TelegramBridgeInternals {
   consecutiveErrors: number;
   dedup: DedupService;
   userSessions: Map<number, string>;
+  sessionCallbacks: Map<string, EventCallback>;
   userMessageTimestamps: Map<number, number[]>;
   poll: () => Promise<void>;
   handleUpdate: (update: { update_id: number; message?: TelegramMessage }) => Promise<void>;
@@ -802,6 +803,138 @@ describe('subscribeForResponse', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
     expect(sentTexts).toHaveLength(0);
+  });
+});
+
+describe('keep-alive warm turns', () => {
+  test('stays subscribed after result when keep_alive=1', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Test',
+      source: 'telegram',
+      keepAlive: true,
+    });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+
+    // First warm turn completes
+    holder.cb!(session.id, makeAssistantEvent('Turn 1 response'));
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Callback should still be registered (not unsubscribed)
+    expect(pm.unsubscribe).not.toHaveBeenCalled();
+    expect(internals(bridge).sessionCallbacks.has(session.id)).toBe(true);
+  });
+
+  test('sends response for each warm turn', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const sentTexts = mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Test',
+      source: 'telegram',
+      keepAlive: true,
+    });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+
+    // First turn
+    holder.cb!(session.id, makeAssistantEvent('First answer'));
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Second turn (same callback, warm path)
+    holder.cb!(session.id, makeAssistantEvent('Second answer'));
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(sentTexts.some((m) => m === 'First answer')).toBe(true);
+    expect(sentTexts.some((m) => m === 'Second answer')).toBe(true);
+    expect(pm.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  test('unsubscribes on session_exited even with keep_alive=1', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Test',
+      source: 'telegram',
+      keepAlive: true,
+    });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+
+    // Warm turn then session exits (TTL expired or explicit stop)
+    holder.cb!(session.id, makeAssistantEvent('Last response'));
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+    holder.cb!(session.id, makeSessionExitedEvent());
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
+    expect(internals(bridge).sessionCallbacks.has(session.id)).toBe(false);
+  });
+
+  test('deduplicates: second subscribeForResponse replaces first callback', () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Test',
+      source: 'telegram',
+      keepAlive: true,
+    });
+    internals(bridge).subscribeForResponse(session.id, 12345, 1);
+    const firstCallback = internals(bridge).sessionCallbacks.get(session.id);
+
+    internals(bridge).subscribeForResponse(session.id, 12345, 2);
+    const secondCallback = internals(bridge).sessionCallbacks.get(session.id);
+
+    // Old callback was unsubscribed, new one is in place
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, firstCallback);
+    expect(secondCallback).not.toBe(firstCallback);
+    expect(pm.subscribe).toHaveBeenCalledTimes(2);
+  });
+
+  test('non-keep-alive session still unsubscribes on result', async () => {
+    const pm = createMockProcessManager();
+    const bridge = new TelegramBridge(db, pm, defaultConfig);
+    mockApiCapture(bridge);
+    const agent = createAgent(db, { name: 'Test Agent', model: 'sonnet', voiceEnabled: false });
+    const project = createProject(db, { name: 'Test Project', workingDir: '/tmp/test' });
+    const session = createSession(db, {
+      projectId: project.id,
+      agentId: agent.id,
+      name: 'Test',
+      source: 'telegram',
+    });
+    const holder = captureSubscribe(pm);
+    internals(bridge).subscribeForResponse(session.id, 12345);
+    holder.cb!(session.id, makeAssistantEvent('Normal response'));
+    holder.cb!(session.id, makeResultEvent());
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(pm.unsubscribe).toHaveBeenCalledWith(session.id, expect.any(Function));
+    expect(internals(bridge).sessionCallbacks.has(session.id)).toBe(false);
   });
 });
 
