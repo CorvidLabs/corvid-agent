@@ -661,6 +661,8 @@ export class ProcessManager {
         skillPrompt: config.skillPrompt,
         conversationOnly: isNoTools || conversationOnly,
         toolAllowList: isRestrictedTools ? toolAllowList : undefined,
+        keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
+        onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
