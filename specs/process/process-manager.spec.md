@@ -1,6 +1,6 @@
 ---
 module: process-manager
-version: 1
+version: 2
 status: active
 files:
   - server/process/manager.ts
@@ -31,6 +31,45 @@ depends_on:
 Central orchestration hub for agent session lifecycles. Manages starting, stopping, resuming, and monitoring Claude agent processes. Integrates every subsystem: persona/skill prompt injection, MCP tool resolution, credit deduction, provider routing (SDK vs direct, Claude vs Ollama), approval workflows, timeout management, auto-restart for AlgoChat sessions, and API outage recovery.
 
 This is the most complex module in the system (~1135 lines after decomposition). It is the single point through which all agent sessions are created and managed. MCP service management and session config resolution have been extracted into dedicated modules.
+
+## Keep-Alive Architecture
+
+The ProcessManager implements a warm-path / cold-path routing strategy for session continuity:
+
+### Warm Path (Keep-Alive)
+
+When a session's SDK process is still alive after its last model turn (`isAlive() === true`), follow-up messages are delivered via `sendMessage()` → `streamInput()`. This bypasses context reconstruction entirely — the model already has the full conversation in its context window.
+
+**Warm path flow:**
+1. `resumeProcess(session, prompt)` called
+2. Check `processes.has(sessionId)` and `process.isAlive()`
+3. Process is alive → call `sendMessage(sessionId, prompt)`
+4. `sendMessage` feeds via `streamInput()`, model processes immediately
+5. If `sendMessage` returns `false` (streamInput failed) → fall through to cold path
+
+### Cold Path (Fallback)
+
+When no live process exists (process died, TTL expired, first message, server restart), the full context reconstruction flow runs. This is the current behavior and remains the default for all non-keep-alive sessions.
+
+**Cold path flow:**
+1. `resumeProcess(session, prompt)` called
+2. No live process (or warm sendMessage failed)
+3. `buildResumePrompt()` constructs context from DB (conversation history, observations, summaries)
+4. `startWithResolvedDir()` spawns a new SDK process with the resume prompt
+5. New process starts fresh with reconstructed context
+
+### When Keep-Alive is Enabled
+
+Keep-alive is enabled per-session via `SpawnOptions.keepAlive`. When enabled:
+- `startProcess()` passes `keepAlive: true` to `startSdkProcess()`
+- The SDK process enters warm state after each model turn instead of exiting
+- `SessionTimerManager` starts a keep-alive TTL timer (distinct from the inactivity timeout)
+- On TTL expiry, the warm process is killed (transitions to cold path for next message)
+- The keep-alive TTL resets on each successful `sendMessage()`
+
+### Token Savings
+
+The warm path avoids re-sending: system prompt (~2-4K tokens), conversation history (variable, often 10-50K tokens), observations (~1-2K tokens), and persona/skill prompts (~1-2K tokens). For a typical 20-message conversation, this saves ~80-90% of input tokens per turn.
 
 ## Public API
 
@@ -240,11 +279,11 @@ Side effects on construction:
 | `setOwnerCheck` | `(fn: (address) => boolean)` | `void` | Inject owner check for credit exemption |
 | `setMcpServices` | `(services: McpServices)` | `void` | Register all MCP-related services for corvid_* tools (delegates to McpServiceContainer) |
 | `startProcess` | `(session: Session, prompt?: string, options?: { depth?, schedulerMode? })` | `void` | Start a new agent process. Routes to SDK or direct based on provider |
-| `resumeProcess` | `(session: Session, prompt?: string)` | `void` | Resume an existing session. Builds history-aware prompt, handles context reset |
+| `resumeProcess` | `(session: Session, prompt?: string)` | `void` | Resume an existing session. Checks for warm process first (warm path) — if alive, delivers via `sendMessage`. Falls back to cold path (build resume prompt, spawn new process) when no live process exists or warm delivery fails |
 | `stopProcess` | `(sessionId: string, reason?: string)` | `void` | Kill process, set status to stopped, emit session_stopped, clean up state |
 | `cleanupSessionState` | `(sessionId: string)` | `void` | Remove all in-memory state for a session (idempotent) |
 | `getMemoryStats` | `()` | `{ processes, subscribers, sessionMeta, pausedSessions, sessionTimeouts, stableTimers, startupTimeouts, globalSubscribers }` | Snapshot of in-memory map sizes |
-| `sendMessage` | `(sessionId: string, content: string \| ContentBlockParam[])` | `boolean` | Send a message to a running process. Persists to DB, tracks turns |
+| `sendMessage` | `(sessionId: string, content: string \| ContentBlockParam[])` | `boolean` | Send a message to a running process via `streamInput()`. Persists to DB, tracks turns, resets keep-alive TTL on success. Returns `false` if process is dead or streamInput fails |
 | `isRunning` | `(sessionId: string)` | `boolean` | Check if a process is active |
 | `subscribe` | `(sessionId: string, callback: EventCallback)` | `void` | Subscribe to session events (replays thinking state for late subscribers) |
 | `unsubscribe` | `(sessionId: string, callback: EventCallback)` | `void` | Unsubscribe from session events |
@@ -283,6 +322,10 @@ Side effects on construction:
 13. **Orphan pruning**: Every 5 minutes, removes subscriber/meta entries for sessions with no active process and not paused
 14. **Memory cleanup single source**: `cleanupSessionState` is the single entry point for all cleanup (process, meta, subscribers, paused state, timers, approval/question managers)
 15. **Cursor per-turn metrics**: When the Cursor CLI completes a model turn it emits `result` events that must not be broadcast (Discord and other listeners treat `result` as session end). The manager accepts synthetic `session_turn_metrics` events from `cursor-process` to persist cost and `session_metrics` rows without broadcasting `result`
+16. **Warm path priority**: `resumeProcess` always checks for a live warm process before falling back to a cold start. The warm path is attempted first; only on failure (process dead, `sendMessage` returns `false`) does cold-path context reconstruction run. This ensures we never needlessly discard a live process's context
+17. **Keep-alive TTL management**: Warm processes have a configurable inactivity TTL (`KEEP_ALIVE_TTL_MS`, default 15 minutes) managed by `SessionTimerManager`. The TTL resets on each successful `sendMessage()`. On expiry, the process is killed via `kill()` and removed from the `processes` map. The next message triggers a cold start
+18. **Warm-to-cold fallback transparency**: When the warm path fails (streamInput error), `resumeProcess` falls through to the cold path silently — the caller and the end user see no difference. A `warm_path_failed` event is emitted for observability but does not surface to the user
+19. **Keep-alive and context reset coexistence**: The existing context reset (after `MAX_TURNS_BEFORE_CONTEXT_RESET` turns) still applies to keep-alive sessions. When triggered, the warm process is killed, a conversation summary is saved, and the next message starts a cold path with compressed context
 
 ## Behavioral Examples
 
@@ -322,6 +365,30 @@ Side effects on construction:
 - **When** 5 minutes pass and API health check succeeds
 - **Then** the session is automatically resumed
 
+### Scenario: Warm path resume — process still alive
+
+- **Given** a session with `keepAlive = true` whose SDK process completed its last turn 5 minutes ago and is in warm state (`isAlive() = true`)
+- **When** `resumeProcess(session, "follow-up question")` is called
+- **Then** the warm process is detected, `sendMessage(sessionId, "follow-up question")` delivers via `streamInput()`, the model processes immediately without context reconstruction, and the keep-alive TTL resets
+
+### Scenario: Warm path failure falls through to cold path
+
+- **Given** a session with `keepAlive = true` whose SDK process is in warm state, but the underlying query has silently closed
+- **When** `resumeProcess(session, "follow-up question")` is called
+- **Then** `sendMessage()` attempts `streamInput()` which fails, returns `false`, a `warm_path_failed` event is emitted, the dead process is evicted from the map, and cold-path context reconstruction runs to spawn a fresh process
+
+### Scenario: Keep-alive TTL expires
+
+- **Given** a warm SDK process that last received a message 15 minutes ago (default TTL)
+- **When** the keep-alive TTL timer fires
+- **Then** the process is killed, removed from the `processes` map, and DB status updated to `idle`. The next message triggers a cold start via `resumeProcess`
+
+### Scenario: Context reset on a keep-alive session
+
+- **Given** a keep-alive session that has processed 40 user messages via the warm path
+- **When** the 41st message arrives and `MAX_TURNS_BEFORE_CONTEXT_RESET` is exceeded
+- **Then** the warm process is killed, a conversation summary is saved as a memory observation, and the message is processed via a cold start with the compressed context
+
 ### Scenario: Credit exhaustion mid-session
 
 - **Given** an AlgoChat session from a non-owner wallet with 1 credit remaining
@@ -340,6 +407,9 @@ Side effects on construction:
 | `resumeSession` for non-paused session | Returns `false` |
 | Max restarts exceeded (3) | Session left in error state, no more retries |
 | Auto-resume max attempts exceeded (10) | Session set to `error`, `auto_resume_exhausted` event emitted |
+| Warm path `sendMessage` fails | `warm_path_failed` event emitted, falls through to cold path transparently |
+| Keep-alive TTL expires | Process killed, status set to `idle`, next message triggers cold start |
+| Warm process receives context overflow signal | Process killed, summary saved, cold start with compressed context |
 
 ## Dependencies
 
@@ -410,6 +480,7 @@ Internal constants (not env-configurable):
 | `MAX_TURNS_BEFORE_CONTEXT_RESET` | `40` | Turns before killing for context reset |
 | `ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD` | `3` | Consecutive zero-turn completions before refusing to resume |
 | `DISCORD_RESTRICTED_MESSAGE_PREFIX` | `'Discord message:'` | Session name prefix for restricted Discord `/message` sessions |
+| `KEEP_ALIVE_TTL_MS` | `900000` | 15 min idle TTL for warm processes before automatic kill |
 
 ## Change Log
 
@@ -425,3 +496,4 @@ Internal constants (not env-configurable):
 | 2026-04-16 | corvid-agent | Document McpServiceContainer methods/isAvailable, full McpServices/BuildContextOptions fields, startStartupTimeout/clearStartupTimeout, fix applyCostUpdate return type (boolean), fix sendMessage signature (ContentBlockParam[]), add flushActiveSessionSummaries, fix getStats to include startupTimeouts, inline EventHandlerDeps/ExitHandlerDeps fields, remove RoutingDecision duplicate, collapse exported-types table with Source column (#2022) |
 | 2026-04-20 | corvid-agent | Add approval-flow.ts (approval request/response bridge) and persona-injector.ts (persona+skill injection facade); add session-lifecycle.ts to files list; document new exported functions |
 | 2026-04-22 | corvid-agent | Add `isAlive()` to `SdkProcess` interface; sendMessage evicts zombie processes from Map; orphan pruner detects dead-in-Map processes via `isAlive()` (#2127) |
+| 2026-05-04 | corvid-agent | v2: Keep-alive architecture — warm path vs cold path routing in resumeProcess, KEEP_ALIVE_TTL_MS, warm_path_failed event, context reset coexistence (#2222, #2223) |
