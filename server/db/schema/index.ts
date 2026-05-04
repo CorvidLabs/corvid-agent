@@ -308,6 +308,7 @@ const MIGRATIONS: Record<number, string[]> = {
   ],
   125: [`ALTER TABLE sessions ADD COLUMN cumulative_turns INTEGER DEFAULT 0`],
   126: [`ALTER TABLE councils ADD COLUMN min_trust_level TEXT`],
+  127: [`ALTER TABLE sessions ADD COLUMN keep_alive INTEGER NOT NULL DEFAULT 0`],
 };
 
 // ── Schema version ──────────────────────────────────────────────────

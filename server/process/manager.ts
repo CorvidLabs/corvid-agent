@@ -1250,8 +1250,8 @@ export class ProcessManager {
           externalMcpConfigs: resumeExternalMcpConfigs,
           conversationOnly: isConversationOnly,
           toolAllowList: resumeToolAllowList,
-          keepAlive: KEEP_ALIVE_ENABLED,
-          onTurnComplete: KEEP_ALIVE_ENABLED ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+          keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
+          onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
         });
       }
     } catch (err) {
