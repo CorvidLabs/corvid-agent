@@ -43,6 +43,10 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `incrementSessionCumulativeTurns` | `(db: Database, id: string)` | `void` | Atomically increment `cumulative_turns` by 1 using COALESCE for NULL safety |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
 | `updateSessionContextTokens` | `(db: Database, id: string, tokens: number, contextWindow: number)` | `void` | Persist real context token count and window size from API |
+| `setDurationCheckpoint` | `(db: Database, id: string, timestampMs: number)` | `void` | Set duration checkpoint (epoch ms) for active-time accumulation |
+| `accumulateActiveDuration` | `(db: Database, id: string)` | `void` | Add elapsed since checkpoint to `active_duration_ms`, reset checkpoint to now |
+| `finalizeActiveDuration` | `(db: Database, id: string)` | `void` | Add elapsed since checkpoint to `active_duration_ms`, clear checkpoint (process exited) |
+| `getSessionActiveDurationMs` | `(db: Database, id: string)` | `number` | Return cumulative active duration including time since current checkpoint |
 | `updateSessionSummary` | `(db: Database, id: string, summary: string)` | `void` | Update the conversation summary for cross-session context carry-over |
 | `getPreviousThreadSessionSummary` | `(db: Database, threadId: string)` | `string \| null` | Get conversation summary from the most recent Discord thread session |
 | `deleteSession` | `(db: Database, id: string)` | `boolean` | Delete session and cascade: delete messages, unlink conversations. Returns false if not found |
@@ -141,12 +145,12 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `incrementSessionCumulativeTurns`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession` |
+| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `incrementSessionCumulativeTurns`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession`, `setDurationCheckpoint`, `accumulateActiveDuration`, `finalizeActiveDuration` |
 | `server/work/service.ts` | `createSession` |
 | `server/scheduler/service.ts` | `createSession` |
 | `server/routes/sessions.ts` | All session CRUD functions |
 | `server/algochat/bridge.ts` | Conversation CRUD functions |
-| `server/discord/thread-response/embed-response.ts` | `getSessionTurns`, `getSessionCumulativeTurns` |
+| `server/discord/thread-response/embed-response.ts` | `getSessionTurns`, `getSessionCumulativeTurns`, `getSessionActiveDurationMs` |
 
 ## Database Tables
 

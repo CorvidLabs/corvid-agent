@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import { getSessionCumulativeTurns, getSessionTurns } from '../../db/sessions';
+import { getSessionActiveDurationMs, getSessionCumulativeTurns, getSessionTurns } from '../../db/sessions';
 import type { DeliveryTracker } from '../../lib/delivery-tracker';
 import { createLogger } from '../../lib/logger';
 import type { EventCallback } from '../../process/interfaces';
@@ -384,6 +384,45 @@ export function subscribeForResponseWithEmbed(
       clearTyping();
       if (debounceTimer) clearTimeout(debounceTimer);
       flush();
+
+      const kaRow = db
+        .query<{ keep_alive: number }, [string]>('SELECT keep_alive FROM sessions WHERE id = ?')
+        .get(sessionId);
+      const isKeepAlive = kaRow?.keep_alive === 1;
+
+      if (isKeepAlive) {
+        // Keep-alive turn complete: show warm status with TTL, stay subscribed for future turns
+        if (progressMessageId) {
+          const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10);
+          const expiresAt = Math.floor((Date.now() + ttlMs) / 1000);
+          const dt = getTurnInfo();
+          editEmbed(delivery, botToken, threadId, progressMessageId, {
+            description: `✅ Done · Expires <t:${expiresAt}:R>`,
+            color: 0x57f287,
+            author,
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'warm' },
+                latestContextUsage,
+                dt.active,
+                dt.cumulative,
+              ),
+            },
+          }).catch((err) => {
+            log.debug('Progress warm edit failed', {
+              threadId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+        buffer = '';
+        receivedAnyContent = false;
+        receivedAnyActivity = false;
+        sentErrorMessage = false;
+        progressMessageId = null;
+        return;
+      }
+
       processManager.unsubscribe(sessionId, callback);
       threadCallbacks.delete(threadId);
 
@@ -438,10 +477,11 @@ export function subscribeForResponseWithEmbed(
           }
 
           if (row) {
-            // Duration — normalizeTimestamp appends Z so JS parses SQLite UTC correctly
+            // Active duration — accumulated process runtime, falls back to wall clock for legacy sessions
+            const activeDuration = getSessionActiveDurationMs(db, sessionId);
             const createdAt = normalizeTimestamp(row.created_at);
             const startMs = new Date(createdAt).getTime();
-            const durationMs = Date.now() - startMs;
+            const durationMs = activeDuration > 0 ? activeDuration : Date.now() - startMs;
             fields.push({ name: 'Duration', value: formatDuration(durationMs), inline: true });
 
             // Turns
@@ -619,6 +659,53 @@ export function subscribeForResponseWithEmbed(
       clearTyping();
       if (debounceTimer) clearTimeout(debounceTimer);
       flush();
+
+      // For keep-alive sessions, show completion embed here (it was deferred at result time)
+      const exitKaRow = db
+        .query<{ keep_alive: number }, [string]>('SELECT keep_alive FROM sessions WHERE id = ?')
+        .get(sessionId);
+      if (exitKaRow?.keep_alive === 1) {
+        const activeDuration = getSessionActiveDurationMs(db, sessionId);
+        const dt = getTurnInfo();
+        const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+        if (activeDuration > 0) {
+          fields.push({ name: 'Active Time', value: formatDuration(activeDuration), inline: true });
+        }
+        const cumTurns = getSessionCumulativeTurns(db, sessionId);
+        if (cumTurns > 0) {
+          fields.push({ name: 'Turns', value: String(cumTurns), inline: true });
+        }
+        const buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }> = [];
+        buttons.push({ label: 'New Session', customId: 'new_session', style: ButtonStyle.SUCCESS, emoji: '🔄' });
+        buttons.push({ label: 'Create Issue', customId: 'create_issue', style: ButtonStyle.PRIMARY, emoji: '📋' });
+        buttons.push({ label: 'Archive', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' });
+        sendEmbedWithButtons(
+          delivery,
+          botToken,
+          threadId,
+          {
+            description: 'Session complete. Send a message to continue the conversation.',
+            color: 0x57f287,
+            author,
+            ...(fields.length > 0 ? { fields } : {}),
+            footer: {
+              text: buildFooterText(
+                { agentName, agentModel, sessionId, projectName, status: 'done' },
+                latestContextUsage,
+                dt.active,
+                dt.cumulative,
+              ),
+            },
+          },
+          [buildActionRow(...buttons)],
+        ).catch((err) => {
+          log.debug('Keep-alive completion embed failed', {
+            threadId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+
       processManager.unsubscribe(sessionId, callback);
       threadCallbacks.delete(threadId);
     }

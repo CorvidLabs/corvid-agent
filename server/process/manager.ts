@@ -11,11 +11,14 @@ import { boostObservation, listObservations, recordObservation } from '../db/obs
 import { getProject } from '../db/projects';
 import { insertSessionMetrics } from '../db/session-metrics';
 import {
+  accumulateActiveDuration,
   addSessionMessage,
+  finalizeActiveDuration,
   getParticipantForSession,
   getSession,
   getSessionMessages,
   incrementSessionCumulativeTurns,
+  setDurationCheckpoint,
   updateSessionContextTokens,
   updateSessionCost,
   updateSessionPid,
@@ -872,6 +875,7 @@ export class ProcessManager {
     updateSessionPid(this.db, session.id, process.pid);
     updateSessionStatus(this.db, session.id, 'running');
     updateSessionTurns(this.db, session.id, resumedTurnCount);
+    setDurationCheckpoint(this.db, session.id, now);
 
     const verify = this.db.query('SELECT status, pid FROM sessions WHERE id = ?').get(session.id) as {
       status: string;
@@ -1057,6 +1061,7 @@ export class ProcessManager {
               contextSummary: summary,
             });
           }
+          setDurationCheckpoint(this.db, session.id, Date.now());
           log.info(`Generated context summary before death-loop reset (${summary.length} chars)`);
         } catch (err) {
           log.warn('Failed to generate summary for death-loop reset', { error: err });
@@ -1289,6 +1294,7 @@ export class ProcessManager {
       updateSessionPid(this.db, session.id, proc.pid);
     }
     updateSessionStatus(this.db, session.id, 'running');
+    setDurationCheckpoint(this.db, session.id, now);
 
     this.timerManager.startStableTimer(session.id);
     this.timerManager.startSessionTimeout(session.id);
@@ -2003,6 +2009,7 @@ export class ProcessManager {
   private handleExit(sessionId: string, code: number | null, errorMessage?: string): void {
     const meta = this.sessionMeta.get(sessionId);
     const session = getSession(this.db, sessionId);
+    finalizeActiveDuration(this.db, sessionId);
     updateSessionPid(this.db, sessionId, null);
 
     const status = code === 0 ? 'idle' : 'error';
@@ -2127,6 +2134,9 @@ export class ProcessManager {
     // Mark session idle in DB — the process is warm but waiting for input
     updateSessionStatus(this.db, sessionId, 'idle');
 
+    // Accumulate active duration up to this turn boundary
+    accumulateActiveDuration(this.db, sessionId);
+
     // Start keep-alive TTL — process will be killed if no new message arrives
     this.timerManager.startKeepAliveTtl(sessionId, KEEP_ALIVE_TTL_MS);
 
@@ -2159,10 +2169,11 @@ export class ProcessManager {
       }
     }
 
+    const ttlExpiresAt = Math.floor((Date.now() + KEEP_ALIVE_TTL_MS) / 1000);
     this.eventBus.emit(sessionId, {
       type: 'system',
       subtype: 'turn_complete',
-      message: { content: JSON.stringify({ warm: true, ...metrics }) },
+      message: { content: JSON.stringify({ warm: true, ...metrics, keepAliveTtlExpiresAt: ttlExpiresAt }) },
     } as ClaudeStreamEvent);
   }
 
