@@ -218,6 +218,8 @@ describe('auto-compact on context_usage event', () => {
     const event = {
       type: 'context_usage',
       session_id: sessionId,
+      estimatedTokens: 184000,
+      contextWindow: 200000,
       usagePercent: 92,
     } as unknown as ClaudeStreamEvent;
 
@@ -237,6 +239,8 @@ describe('auto-compact on context_usage event', () => {
     const event = {
       type: 'context_usage',
       session_id: sessionId,
+      estimatedTokens: 170000,
+      contextWindow: 200000,
       usagePercent: 85,
     } as unknown as ClaudeStreamEvent;
 
@@ -256,6 +260,8 @@ describe('auto-compact on context_usage event', () => {
     const event = {
       type: 'context_usage',
       session_id: sessionId,
+      estimatedTokens: 150000,
+      contextWindow: 200000,
       usagePercent: 75,
     } as unknown as ClaudeStreamEvent;
 
@@ -276,6 +282,8 @@ describe('auto-compact on context_usage event', () => {
     const event = {
       type: 'context_usage',
       session_id: sessionId,
+      estimatedTokens: 180000,
+      contextWindow: 200000,
       usagePercent: 90,
     } as unknown as ClaudeStreamEvent;
 

@@ -1911,7 +1911,7 @@ export class ProcessManager {
     // Track context usage and auto-compact at threshold
     if (event.type === 'context_usage' && meta) {
       const usage = event as { estimatedTokens?: number; contextWindow?: number; usagePercent?: number };
-      if (usage.usagePercent != null && usage.usagePercent > 0) {
+      if (usage.usagePercent != null && usage.usagePercent > 0 && (usage.estimatedTokens ?? 0) >= 1000) {
         meta.lastContextUsagePercent = usage.usagePercent;
         if (usage.estimatedTokens && usage.contextWindow) {
           updateSessionContextTokens(this.db, sessionId, usage.estimatedTokens, usage.contextWindow);
