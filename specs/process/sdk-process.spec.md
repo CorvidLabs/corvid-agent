@@ -65,6 +65,7 @@ start() ──→ [processing] ──→ model turn complete ──→ [warm]
 |------|-------------|
 | `SdkProcessOptions` | Full configuration for starting an SDK process: session, project, agent, prompt, callbacks, MCP servers, persona/skill prompts. Includes `keepAlive?: boolean` to enable warm process mode |
 | `SdkProcess` | Running process handle: `{ pid, sendMessage, kill, isAlive, isWarm }` |
+| `TurnCompleteMetrics` | Metrics passed to `onTurnComplete` callback: `{ totalCostUsd, durationMs, numTurns }` |
 
 ### Exported Constants
 

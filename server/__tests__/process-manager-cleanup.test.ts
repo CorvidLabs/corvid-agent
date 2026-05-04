@@ -92,11 +92,13 @@ describe('getMemoryStats', () => {
   test('returns zero counts on fresh instance', () => {
     const stats = pm.getMemoryStats();
     expect(stats.processes).toBe(0);
+    expect(stats.warmProcesses).toBe(0);
     expect(stats.subscribers).toBe(0);
     expect(stats.sessionMeta).toBe(0);
     expect(stats.pausedSessions).toBe(0);
     expect(stats.sessionTimeouts).toBe(0);
     expect(stats.stableTimers).toBe(0);
+    expect(stats.keepAliveTimers).toBe(0);
     expect(stats.globalSubscribers).toBe(0);
   });
 
@@ -244,6 +246,7 @@ function makeMockProcess(alive: boolean = true): SdkProcess {
       killed = true;
     },
     isAlive: () => alive && !killed,
+    isWarm: () => false,
   };
 }
 

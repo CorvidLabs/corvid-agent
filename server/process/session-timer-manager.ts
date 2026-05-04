@@ -19,6 +19,8 @@ export interface SessionTimerCallbacks {
   onStablePeriod: (sessionId: string) => void;
   /** Called when a session produces no events within the startup window. */
   onStartupTimeout: (sessionId: string) => void;
+  /** Called when a warm process's keep-alive TTL expires. */
+  onKeepAliveExpiry?: (sessionId: string) => void;
   /** Check whether a session has an active process. */
   isRunning: (sessionId: string) => boolean;
   /** Get the last activity timestamp for a session (epoch ms), or undefined if not tracked. */
@@ -34,6 +36,8 @@ export interface SessionTimerConfig {
   timeoutCheckIntervalMs: number;
   /** Max time (ms) to wait for the first event after process registration. Default: 90s. */
   startupTimeoutMs: number;
+  /** Keep-alive TTL for warm processes in ms. Default: 15 minutes. */
+  keepAliveTtlMs: number;
 }
 
 const DEFAULT_CONFIG: SessionTimerConfig = {
@@ -41,6 +45,7 @@ const DEFAULT_CONFIG: SessionTimerConfig = {
   stablePeriodMs: 10 * 60 * 1000,
   timeoutCheckIntervalMs: 60_000,
   startupTimeoutMs: parseInt(process.env.STARTUP_TIMEOUT_MS ?? '90000', 10),
+  keepAliveTtlMs: parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10),
 };
 
 export class SessionTimerManager {
@@ -50,6 +55,7 @@ export class SessionTimerManager {
   private stableTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private sessionTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private startupTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private keepAliveTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private timeoutTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(callbacks: SessionTimerCallbacks, config: Partial<SessionTimerConfig> = {}) {
@@ -180,6 +186,30 @@ export class SessionTimerManager {
   }
 
   /**
+   * Start (or reset) the keep-alive TTL for a warm process.
+   * On expiry, fires onKeepAliveExpiry — the process should be killed.
+   */
+  startKeepAliveTtl(sessionId: string, ttlMs?: number): void {
+    this.clearKeepAliveTtl(sessionId);
+    const effectiveTtl = ttlMs ?? this.config.keepAliveTtlMs;
+    const timer = setTimeout(() => {
+      this.keepAliveTimers.delete(sessionId);
+      if (!this.callbacks.isRunning(sessionId)) return;
+      log.info(`Keep-alive TTL expired for session ${sessionId}`, { ttlMs: effectiveTtl });
+      this.callbacks.onKeepAliveExpiry?.(sessionId);
+    }, effectiveTtl);
+    this.keepAliveTimers.set(sessionId, timer);
+  }
+
+  clearKeepAliveTtl(sessionId: string): void {
+    const timer = this.keepAliveTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.keepAliveTimers.delete(sessionId);
+    }
+  }
+
+  /**
    * Clean up all timers for a specific session.
    * Called during session cleanup to prevent timer leaks.
    */
@@ -187,16 +217,18 @@ export class SessionTimerManager {
     this.clearStableTimer(sessionId);
     this.clearSessionTimeout(sessionId);
     this.clearStartupTimeout(sessionId);
+    this.clearKeepAliveTtl(sessionId);
   }
 
   /**
    * Get the count of active timers for monitoring.
    */
-  getStats(): { sessionTimeouts: number; stableTimers: number; startupTimeouts: number } {
+  getStats(): { sessionTimeouts: number; stableTimers: number; startupTimeouts: number; keepAliveTimers: number } {
     return {
       sessionTimeouts: this.sessionTimeouts.size,
       startupTimeouts: this.startupTimeouts.size,
       stableTimers: this.stableTimers.size,
+      keepAliveTimers: this.keepAliveTimers.size,
     };
   }
 
@@ -220,5 +252,9 @@ export class SessionTimerManager {
       clearTimeout(timer);
     }
     this.startupTimeouts.clear();
+    for (const timer of this.keepAliveTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.keepAliveTimers.clear();
   }
 }

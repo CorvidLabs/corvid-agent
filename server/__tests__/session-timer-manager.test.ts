@@ -35,6 +35,7 @@ describe('SessionTimerManager', () => {
       expect(stats.sessionTimeouts).toBe(0);
       expect(stats.stableTimers).toBe(0);
       expect(stats.startupTimeouts).toBe(0);
+      expect(stats.keepAliveTimers).toBe(0);
     });
 
     it('accepts custom config', () => {
@@ -272,14 +273,17 @@ describe('SessionTimerManager', () => {
       manager.startStableTimer('s1');
       manager.startSessionTimeout('s1');
       manager.startStartupTimeout('s1');
+      manager.startKeepAliveTtl('s1');
       expect(manager.getStats().stableTimers).toBe(1);
       expect(manager.getStats().sessionTimeouts).toBe(1);
       expect(manager.getStats().startupTimeouts).toBe(1);
+      expect(manager.getStats().keepAliveTimers).toBe(1);
 
       manager.cleanupSession('s1');
       expect(manager.getStats().stableTimers).toBe(0);
       expect(manager.getStats().sessionTimeouts).toBe(0);
       expect(manager.getStats().startupTimeouts).toBe(0);
+      expect(manager.getStats().keepAliveTimers).toBe(0);
     });
   });
 
