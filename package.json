@@ -89,9 +89,9 @@
     "@vscode/tree-sitter-wasm": "0.3.1",
     "algosdk": "^3.5.2",
     "croner": "^10.0.1",
-    "discord.js": "^14.26.3",
+    "discord.js": "^14.26.4",
     "libsodium-wrappers": "^0.8.4",
-    "marked": "^18.0.2",
+    "marked": "^18.0.3",
     "opusscript": "^0.1.1",
     "web-tree-sitter": "0.26.8",
     "zod": "~4.3.6"
