@@ -134,7 +134,8 @@ export class CorvidEmbed {
   private _projectName?: string;
   private _status?: string;
 
-  // Footer stats
+  // Footer
+  private _footerOverride?: string;
   private _contextUsage?: ContextUsage;
   private _turns?: number;
   private _cumulativeTurns?: number;
@@ -231,6 +232,11 @@ export class CorvidEmbed {
     return this;
   }
 
+  setFooter(text: string): this {
+    this._footerOverride = text;
+    return this;
+  }
+
   /**
    * Add buttons to the embed's action row.
    * Keys must be from EMBED_BUTTONS.
@@ -273,8 +279,10 @@ export class CorvidEmbed {
       embed.author = buildAgentAuthor(this._agentIdentity);
     }
 
-    // Footer — only built when an agent name is present
-    if (this._agentName) {
+    // Footer — explicit override takes precedence, then auto-build from agent context
+    if (this._footerOverride) {
+      embed.footer = { text: this._footerOverride };
+    } else if (this._agentName) {
       const ctx: FooterContext = {
         agentName: this._agentName,
         ...(this._agentModel ? { agentModel: this._agentModel } : {}),
@@ -415,12 +423,13 @@ export class CorvidEmbed {
   /**
    * Blurple "Task Queued" embed for work task intake.
    */
-  static workTaskQueued(taskId: string, description: string): CorvidEmbed {
+  static workTaskQueued(taskId: string, description: string, status?: string): CorvidEmbed {
     const truncated = description.slice(0, 200) + (description.length > 200 ? '...' : '');
     return new CorvidEmbed()
       .setTitle('Task Queued')
       .setDescription(`**${taskId}**\n\n${truncated}`)
-      .setColor(EMBED_COLORS.working);
+      .setColor(EMBED_COLORS.working)
+      .setFooter(`Status: ${status ?? 'queued'}`);
   }
 
   /**
@@ -445,7 +454,8 @@ export class CorvidEmbed {
     return new CorvidEmbed()
       .setTitle('Task Update')
       .setDescription(`**${taskId}**\n\n${desc}`)
-      .setColor(color);
+      .setColor(color)
+      .setFooter(`Status: ${status}`);
   }
 
   /**
@@ -456,7 +466,7 @@ export class CorvidEmbed {
       .setTitle('Task Completed')
       .setDescription(description.slice(0, 300))
       .setColor(EMBED_COLORS.success)
-      .addField('Task', taskId, true);
+      .setFooter(`Task: ${taskId}`);
   }
 
   /**
@@ -467,6 +477,6 @@ export class CorvidEmbed {
       .setTitle('Task Failed')
       .setDescription(description.slice(0, 300))
       .setColor(EMBED_COLORS.errorAlt)
-      .addField('Task', taskId, true);
+      .setFooter(`Task: ${taskId}`);
   }
 }

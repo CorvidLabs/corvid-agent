@@ -76,7 +76,7 @@ export async function handleWorkIntake(
 
     log.info('Work task created from Discord', { taskId: task.id, userId });
 
-    const { embed: queuedEmbed } = CorvidEmbed.workTaskQueued(task.id, description).build();
+    const { embed: queuedEmbed } = CorvidEmbed.workTaskQueued(task.id, description, task.status).build();
     await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, queuedEmbed);
 
     ctx.workTaskService.onStatusChange(task.id, (updatedTask) => {

@@ -649,10 +649,9 @@ describe('CorvidEmbed.workTaskCompleted()', () => {
     expect(embed.description?.length).toBeLessThanOrEqual(300);
   });
 
-  test('has task id in fields', () => {
+  test('has task id in footer', () => {
     const { embed } = CorvidEmbed.workTaskCompleted('task-abc', 'Done').build();
-    const taskField = embed.fields?.find((f) => f.value === 'task-abc');
-    expect(taskField).toBeDefined();
+    expect(embed.footer?.text).toBe('Task: task-abc');
   });
 });
 
@@ -679,10 +678,9 @@ describe('CorvidEmbed.workTaskFailed()', () => {
     expect(embed.description?.length).toBeLessThanOrEqual(300);
   });
 
-  test('has task id in fields', () => {
+  test('has task id in footer', () => {
     const { embed } = CorvidEmbed.workTaskFailed('task-xyz', 'Failed').build();
-    const taskField = embed.fields?.find((f) => f.value === 'task-xyz');
-    expect(taskField).toBeDefined();
+    expect(embed.footer?.text).toBe('Task: task-xyz');
   });
 });
 

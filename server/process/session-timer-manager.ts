@@ -36,7 +36,7 @@ export interface SessionTimerConfig {
   timeoutCheckIntervalMs: number;
   /** Max time (ms) to wait for the first event after process registration. Default: 90s. */
   startupTimeoutMs: number;
-  /** Keep-alive TTL for warm processes in ms. Default: 15 minutes. */
+  /** Keep-alive TTL for warm processes in ms. Default: 2 hours. */
   keepAliveTtlMs: number;
 }
 
@@ -45,7 +45,7 @@ const DEFAULT_CONFIG: SessionTimerConfig = {
   stablePeriodMs: 10 * 60 * 1000,
   timeoutCheckIntervalMs: 60_000,
   startupTimeoutMs: parseInt(process.env.STARTUP_TIMEOUT_MS ?? '90000', 10),
-  keepAliveTtlMs: parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10),
+  keepAliveTtlMs: parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(2 * 60 * 60 * 1000), 10),
 };
 
 export class SessionTimerManager {

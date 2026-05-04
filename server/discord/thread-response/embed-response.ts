@@ -355,7 +355,7 @@ export function subscribeForResponseWithEmbed(
       if (isKeepAlive) {
         // Keep-alive turn complete: show warm status with TTL, stay subscribed for future turns
         if (progressMessageId) {
-          const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10);
+          const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(2 * 60 * 60 * 1000), 10);
           const expiresAt = Math.floor((Date.now() + ttlMs) / 1000);
           const dt = getTurnInfo();
           const warmBuilder = CorvidEmbed.warm(footerCtx, authorIdentity, expiresAt);
