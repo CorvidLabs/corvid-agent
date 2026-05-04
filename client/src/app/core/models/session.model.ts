@@ -17,6 +17,7 @@ export interface Session {
     totalTurns: number;
     councilLaunchId: string | null;
     councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
+    keepAlive: boolean;
     createdAt: string;
     updatedAt: string;
 }

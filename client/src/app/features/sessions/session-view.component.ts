@@ -40,6 +40,9 @@ type SessionTab = 'conversation' | 'memory' | 'info';
                         @if (s.status === 'running' || s.status === 'thinking' || s.status === 'tool_use') {
                             <span class="session-view__live-dot" title="Session is active"></span>
                         }
+                        @if (s.keepAlive && s.status === 'idle') {
+                            <span class="session-view__warm-badge" title="Process warm — instant resume">warm</span>
+                        }
                     </div>
                     <div class="session-view__meta">
                         <span class="meta-item"><span class="meta-label">Agent</span> {{ agentName() }}</span>
@@ -252,6 +255,12 @@ type SessionTab = 'conversation' | 'memory' | 'info';
         @keyframes livePulse {
             0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-green-glow); }
             50% { opacity: 0.5; box-shadow: 0 0 12px var(--accent-green-glow); }
+        }
+        .session-view__warm-badge {
+            display: inline-block; padding: 1px 6px;
+            border-radius: var(--radius-sm); font-size: 0.6rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid var(--accent-amber-border);
         }
         .session-view__meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); margin-left: auto; flex-wrap: wrap; align-items: center; }
         .meta-item { white-space: nowrap; }
