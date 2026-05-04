@@ -20,6 +20,7 @@ import {
   buildSafeEnv,
   ENV_ALLOWLIST,
   isApiError,
+  MessageQueue,
   mapSdkMessageToEvent,
 } from '../process/sdk-process';
 import type { ClaudeStreamEvent } from '../process/types';
@@ -616,5 +617,145 @@ describe('messaging safety prompt for sdk-process', () => {
     expect(combined).toContain(agentSystemPrompt);
     expect(combined).toContain(agentAppendPrompt);
     expect(combined).toContain('## Messaging Safety');
+  });
+});
+
+// ── MessageQueue (keep-alive persistent input queue) ────────────────────────
+
+function makeUserMsg(content: string): import('@anthropic-ai/claude-agent-sdk').SDKUserMessage {
+  return {
+    type: 'user',
+    message: { role: 'user', content },
+    parent_tool_use_id: null,
+    session_id: 'test-session',
+  } as import('@anthropic-ai/claude-agent-sdk').SDKUserMessage;
+}
+
+describe('MessageQueue', () => {
+  test('implements AsyncIterable protocol', () => {
+    const q = new MessageQueue();
+    expect(q[Symbol.asyncIterator]()).toBe(q);
+  });
+
+  test('enqueue then next returns the message', async () => {
+    const q = new MessageQueue();
+    const msg = makeUserMsg('hello');
+    q.enqueue(msg);
+
+    const result = await q.next();
+    expect(result.done).toBe(false);
+    expect(result.value).toBe(msg);
+  });
+
+  test('delivers messages in FIFO order', async () => {
+    const q = new MessageQueue();
+    const m1 = makeUserMsg('first');
+    const m2 = makeUserMsg('second');
+    const m3 = makeUserMsg('third');
+    q.enqueue(m1);
+    q.enqueue(m2);
+    q.enqueue(m3);
+
+    expect((await q.next()).value).toBe(m1);
+    expect((await q.next()).value).toBe(m2);
+    expect((await q.next()).value).toBe(m3);
+  });
+
+  test('next() blocks until a message is enqueued', async () => {
+    const q = new MessageQueue();
+    const msg = makeUserMsg('delayed');
+
+    const promise = q.next();
+
+    // Enqueue after a microtask to prove next() was waiting
+    queueMicrotask(() => q.enqueue(msg));
+
+    const result = await promise;
+    expect(result.done).toBe(false);
+    expect(result.value).toBe(msg);
+  });
+
+  test('close() resolves a pending next() with done: true', async () => {
+    const q = new MessageQueue();
+
+    const promise = q.next();
+    q.close();
+
+    const result = await promise;
+    expect(result.done).toBe(true);
+  });
+
+  test('next() returns done immediately after close with empty queue', async () => {
+    const q = new MessageQueue();
+    q.close();
+
+    const result = await q.next();
+    expect(result.done).toBe(true);
+  });
+
+  test('drains buffered messages before signalling done after close', async () => {
+    const q = new MessageQueue();
+    const m1 = makeUserMsg('buffered-1');
+    const m2 = makeUserMsg('buffered-2');
+    q.enqueue(m1);
+    q.enqueue(m2);
+    q.close();
+
+    const r1 = await q.next();
+    expect(r1.done).toBe(false);
+    expect(r1.value).toBe(m1);
+
+    const r2 = await q.next();
+    expect(r2.done).toBe(false);
+    expect(r2.value).toBe(m2);
+
+    const r3 = await q.next();
+    expect(r3.done).toBe(true);
+  });
+
+  test('enqueue after close is silently ignored', async () => {
+    const q = new MessageQueue();
+    q.close();
+    q.enqueue(makeUserMsg('ignored'));
+
+    const result = await q.next();
+    expect(result.done).toBe(true);
+  });
+
+  test('works as async iterable with for-await', async () => {
+    const q = new MessageQueue();
+    const messages = [makeUserMsg('a'), makeUserMsg('b'), makeUserMsg('c')];
+    for (const m of messages) q.enqueue(m);
+    q.close();
+
+    const collected: string[] = [];
+    for await (const msg of q) {
+      const content = (msg as { message: { content: string } }).message.content;
+      collected.push(content);
+    }
+
+    expect(collected).toEqual(['a', 'b', 'c']);
+  });
+
+  test('interleaved enqueue and next', async () => {
+    const q = new MessageQueue();
+
+    q.enqueue(makeUserMsg('1'));
+    expect((await q.next()).value.message.content).toBe('1');
+
+    q.enqueue(makeUserMsg('2'));
+    q.enqueue(makeUserMsg('3'));
+    expect((await q.next()).value.message.content).toBe('2');
+    expect((await q.next()).value.message.content).toBe('3');
+
+    const pending = q.next();
+    q.enqueue(makeUserMsg('4'));
+    expect((await pending).value.message.content).toBe('4');
+  });
+
+  test('multiple close calls do not throw', () => {
+    const q = new MessageQueue();
+    q.close();
+    expect(() => q.close()).not.toThrow();
   });
 });
