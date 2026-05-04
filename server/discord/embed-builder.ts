@@ -168,6 +168,11 @@ export class CorvidEmbed {
     return this;
   }
 
+  setModel(model: string): this {
+    this._agentModel = model;
+    return this;
+  }
+
   setSession(sessionId: string): this {
     this._sessionId = sessionId;
     return this;
@@ -305,14 +310,20 @@ export class CorvidEmbed {
    * Gray "Received — working on it..." progress embed.
    * Sent immediately when a Discord message is received.
    */
+  private static applyContext(builder: CorvidEmbed, ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
+    builder.setAgent(author);
+    if (ctx.agentModel) builder.setModel(ctx.agentModel);
+    if (ctx.sessionId) builder.setSession(ctx.sessionId);
+    if (ctx.projectName) builder.setProject(ctx.projectName);
+    return builder;
+  }
+
   static progress(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
+    const b = new CorvidEmbed()
       .setDescription('Received — working on it...')
       .setColor(EMBED_COLORS.neutral)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('thinking');
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
@@ -320,26 +331,22 @@ export class CorvidEmbed {
    * Used for live tool execution status updates.
    */
   static toolStatus(message: string, ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
+    const b = new CorvidEmbed()
       .setDescription(`⏳ ${message}`)
       .setColor(EMBED_COLORS.neutral)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('working...');
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
    * Green "✅ Done · Expires <t:X:R>" embed for warm (keep-alive) sessions.
    */
   static warm(ctx: FooterContext, author: EmbedAgentIdentity, expiresAtUnix: number): CorvidEmbed {
-    return new CorvidEmbed()
+    const b = new CorvidEmbed()
       .setDescription(`✅ Done · Expires <t:${expiresAtUnix}:R>`)
       .setColor(EMBED_COLORS.success)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('warm');
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
@@ -347,13 +354,11 @@ export class CorvidEmbed {
    * Used when editing the progress embed after a result arrives.
    */
   static done(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
+    const b = new CorvidEmbed()
       .setDescription('✅ Done')
       .setColor(EMBED_COLORS.success)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('done');
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
@@ -361,14 +366,12 @@ export class CorvidEmbed {
    * Sent at the end of a session as the final summary embed.
    */
   static completion(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
-      .setDescription('Session complete. Start a new session or archive this thread.')
+    const b = new CorvidEmbed()
+      .setDescription('Session complete. Send a message to continue the conversation.')
       .setColor(EMBED_COLORS.success)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('done')
       .withButtons(['new_session', 'create_issue', 'archive']);
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
@@ -376,14 +379,12 @@ export class CorvidEmbed {
    * Sent when an agent process crashes.
    */
   static crash(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
-      .setDescription('The agent ended unexpectedly. Press Resume to restart.')
+    const b = new CorvidEmbed()
+      .setDescription('The agent session ended unexpectedly. Send a message to resume.')
       .setColor(EMBED_COLORS.error)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
       .setStatus('crashed')
       .withButtons(['resume']);
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
@@ -393,28 +394,22 @@ export class CorvidEmbed {
    */
   static error(errorType: string, ctx: FooterContext, author: EmbedAgentIdentity, fallbackMessage?: string): CorvidEmbed {
     const { title, description, color } = sessionErrorEmbed(errorType, fallbackMessage);
-    return new CorvidEmbed()
+    const b = new CorvidEmbed()
       .setTitle(title)
       .setDescription(description)
       .setColor(color)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
-      .setStatus('error');
+      .setStatus(errorType);
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**
    * Yellow "taking too long" timeout warning embed.
    */
   static timeout(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    return new CorvidEmbed()
-      .setTitle('Taking Too Long')
-      .setDescription('The session is taking longer than expected. It will continue in the background.')
-      .setColor(EMBED_COLORS.warning)
-      .setAgent(author)
-      .setSession(ctx.sessionId ?? '')
-      .setProject(ctx.projectName ?? '')
-      .setStatus('timeout');
+    const b = new CorvidEmbed()
+      .setDescription('The agent appears to be taking too long. It may still be working — send a message to check.')
+      .setColor(EMBED_COLORS.warning);
+    return CorvidEmbed.applyContext(b, ctx, author);
   }
 
   /**

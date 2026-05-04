@@ -195,19 +195,25 @@ describe('CorvidEmbed builder — footer', () => {
     expect(embed.footer?.text).toContain('Rook');
   });
 
-  test('footer includes model when agentModel is on identity (via setProject/setSession)', () => {
-    // model comes from FooterContext — need to check that setAgent + context flows through
+  test('footer includes model when set via setModel', () => {
     const { embed } = new CorvidEmbed()
       .setAgent(AUTHOR)
+      .setModel('claude-sonnet-4-6')
       .setSession('abcdef1234567890')
       .setProject('corvid-agent')
       .setStatus('thinking')
       .build();
     const footer = embed.footer!.text;
     expect(footer).toContain('Rook');
+    expect(footer).toContain('claude-sonnet-4-6');
     expect(footer).toContain('sid:abcdef12');
     expect(footer).toContain('corvid-agent');
     expect(footer).toContain('thinking');
+  });
+
+  test('presets pass agentModel from FooterContext to footer', () => {
+    const { embed } = CorvidEmbed.progress(CTX, AUTHOR).build();
+    expect(embed.footer!.text).toContain('claude-sonnet-4-6');
   });
 
   test('withContextUsage adds usage to footer', () => {
@@ -539,14 +545,9 @@ describe('CorvidEmbed.timeout()', () => {
     expect(embed.color).toBe(EMBED_COLORS.warning);
   });
 
-  test('title is Taking Too Long', () => {
+  test('description mentions taking too long', () => {
     const { embed } = CorvidEmbed.timeout(CTX, AUTHOR).build();
-    expect(embed.title).toBe('Taking Too Long');
-  });
-
-  test('description mentions background', () => {
-    const { embed } = CorvidEmbed.timeout(CTX, AUTHOR).build();
-    expect(embed.description?.toLowerCase()).toContain('background');
+    expect(embed.description?.toLowerCase()).toContain('taking too long');
   });
 });
 
