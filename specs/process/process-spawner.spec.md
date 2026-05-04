@@ -1,6 +1,6 @@
 ---
 module: process-spawner
-version: 1
+version: 2
 status: active
 files:
   - server/process/process-spawner.ts
@@ -19,6 +19,23 @@ Low-level process spawning extracted from `manager.ts`. Handles the mechanics of
 
 Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested and wired without circular imports back to the ProcessManager class.
 
+## Keep-Alive Integration
+
+The process spawner is the **cold path only**. It is never called when the warm path succeeds — warm path delivery happens entirely within `ProcessManager.resumeProcess()` via `sendMessage()`.
+
+### Warm Path Guard
+
+Before calling any spawner function, the `ProcessManager` checks whether a live warm process already exists for the session. The spawner functions are only reached when:
+1. No process exists in the `processes` map
+2. The process exists but `isAlive()` returns `false`
+3. Warm path `sendMessage()` was attempted but returned `false`
+
+This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and `resumeWithResolvedDir` are all cold-path-only and will never race with a warm process.
+
+### keepAlive Pass-Through
+
+`SpawnOptions` includes a new `keepAlive?: boolean` field. When set, it is passed through to `startSdkProcess()` so the SDK process enters warm state after each model turn. The spawner itself does not manage the keep-alive lifecycle — that responsibility belongs to `ProcessManager` and `SessionTimerManager`.
+
 ## Public API
 
 ### Exported Types
@@ -27,7 +44,7 @@ Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested a
 |------|-------------|
 | `SessionMetaForSpawn` | Mutable session metadata tracked in-memory: startedAt, source, restartCount, lastKnownCostUsd, turnCount, lastActivityAt, contextSummary |
 | `ProcessSpawnerDeps` | Dependency bag for all spawner functions: db, approvalManager, timerManager, process/meta/ephemeral maps, event callbacks, MCP context builder |
-| `SpawnOptions` | Common options for start/resume calls: depth, schedulerMode, schedulerActionType, conversationOnly, toolAllowList, mcpToolAllowList |
+| `SpawnOptions` | Common options for start/resume calls: depth, schedulerMode, schedulerActionType, conversationOnly, toolAllowList, mcpToolAllowList, keepAlive |
 
 ### Exported Functions
 
@@ -48,6 +65,8 @@ Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested a
 4. **Spawn errors emit both `error` and `session_error`**: Failed spawns emit a generic `error` event and a structured `session_error` event with `severity: fatal, recoverable: false`
 5. **Ephemeral dir tracked per session**: Ephemeral directories are stored in the `ephemeralDirs` map keyed by session ID and cleaned up via `releaseEphemeralDir`
 6. **Provider routing**: Direct-mode providers use `spawnDirectProcess`; SDK-mode (or Ollama with proxy enabled) uses `spawnSdkProcess`
+7. **Cold-path-only execution**: All spawner functions assume no warm process exists for the target session. The warm path guard in `ProcessManager.resumeProcess()` ensures spawner functions are only called when the warm path is unavailable or has failed
+8. **keepAlive pass-through**: When `SpawnOptions.keepAlive` is `true`, it is forwarded to `startSdkProcess()` via `SdkProcessOptions.keepAlive`. The spawner does not interpret or manage this flag — it merely passes it through
 
 ## Behavioral Examples
 
@@ -68,6 +87,18 @@ Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested a
 - **Given** `conversationOnly: true` in spawn options
 - **When** `spawnSdkProcess` is called
 - **Then** no MCP servers are created and `conversationOnly` is passed through to `startSdkProcess`
+
+### Scenario: Cold start with keepAlive enabled
+
+- **Given** a session with no live process and `keepAlive = true` in spawn options
+- **When** `spawnSdkProcess` is called (after warm path guard confirmed no warm process)
+- **Then** `startSdkProcess` is called with `keepAlive: true` in its options, and the resulting process will enter warm state after its first model turn instead of exiting
+
+### Scenario: Spawner not called when warm process exists
+
+- **Given** a session with a live warm SDK process (`isAlive() = true`)
+- **When** `resumeProcess` is called on the `ProcessManager`
+- **Then** the warm path delivers via `sendMessage()` and no spawner function is invoked
 
 ## Error Cases
 
@@ -105,3 +136,4 @@ Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested a
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-04-16 | Jackdaw | Initial extraction from manager.ts |
+| 2026-05-04 | corvid-agent | v2: Keep-alive integration — warm path guard, keepAlive pass-through in SpawnOptions, cold-path-only invariant (#2222, #2232) |
