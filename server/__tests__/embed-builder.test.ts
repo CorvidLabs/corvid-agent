@@ -188,14 +188,14 @@ describe('CorvidEmbed builder — footer', () => {
     expect(embed.footer).toBeUndefined();
   });
 
-  test('footer includes agent name when setAgent is called', () => {
+  test('footer excludes agent name (shown in embed author instead)', () => {
     const { embed } = new CorvidEmbed()
       .setAgent({ agentName: 'Rook' })
       .build();
-    expect(embed.footer?.text).toContain('Rook');
+    expect(embed.footer?.text).toBe('');
   });
 
-  test('footer includes model when set via setModel', () => {
+  test('footer includes shortened model, session, and status', () => {
     const { embed } = new CorvidEmbed()
       .setAgent(AUTHOR)
       .setModel('claude-sonnet-4-6')
@@ -204,16 +204,16 @@ describe('CorvidEmbed builder — footer', () => {
       .setStatus('thinking')
       .build();
     const footer = embed.footer!.text;
-    expect(footer).toContain('Rook');
-    expect(footer).toContain('claude-sonnet-4-6');
-    expect(footer).toContain('sid:abcdef12');
-    expect(footer).toContain('corvid-agent');
+    expect(footer).toContain('sonnet-4.6');
+    expect(footer).toContain('abcdef12');
+    expect(footer).not.toContain('Rook');
+    expect(footer).not.toContain('corvid-agent');
     expect(footer).toContain('thinking');
   });
 
-  test('presets pass agentModel from FooterContext to footer', () => {
+  test('presets pass shortened agentModel from FooterContext to footer', () => {
     const { embed } = CorvidEmbed.progress(CTX, AUTHOR).build();
-    expect(embed.footer!.text).toContain('claude-sonnet-4-6');
+    expect(embed.footer!.text).toContain('sonnet-4.6');
   });
 
   test('withContextUsage adds usage to footer', () => {
@@ -380,9 +380,10 @@ describe('CorvidEmbed.progress()', () => {
     expect(embed.description).toContain('working on it');
   });
 
-  test('footer contains agent name', () => {
+  test('footer contains shortened model, not agent name', () => {
     const { embed } = CorvidEmbed.progress(CTX, AUTHOR).build();
-    expect(embed.footer?.text).toContain('Rook');
+    expect(embed.footer?.text).toContain('sonnet-4.6');
+    expect(embed.footer?.text).not.toContain('Rook');
   });
 
   test('footer status is thinking', () => {
@@ -531,9 +532,10 @@ describe('CorvidEmbed.error()', () => {
     expect(embed.description).toBe('Custom fallback message');
   });
 
-  test('footer contains agent name', () => {
+  test('footer contains shortened model, not agent name', () => {
     const { embed } = CorvidEmbed.error('timeout', CTX, AUTHOR).build();
-    expect(embed.footer?.text).toContain('Rook');
+    expect(embed.footer?.text).toContain('sonnet-4.6');
+    expect(embed.footer?.text).not.toContain('Rook');
   });
 });
 
@@ -725,7 +727,7 @@ describe('CorvidEmbed chaining', () => {
     expect(embed.description).toBe('✅ Done');
     expect(embed.color).toBe(EMBED_COLORS.success);
     expect(embed.author?.name).toBe('🐦 Rook');
-    expect(embed.footer?.text).toContain('Rook');
+    expect(embed.footer?.text).not.toContain('Rook');
     expect(embed.footer?.text).toContain('T:10');
     expect(components).toHaveLength(1);
     expect(components![0].components).toHaveLength(2);

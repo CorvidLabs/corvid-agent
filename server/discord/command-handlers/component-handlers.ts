@@ -141,6 +141,7 @@ export async function handleComponentInteraction(
         initialPrompt: prevInfo?.topic ?? 'New session',
         source: 'discord' as SessionSource,
         workDir,
+        keepAlive: true,
       });
 
       const threadInfo: ThreadSessionInfo = {
@@ -226,6 +227,7 @@ export async function handleComponentInteraction(
         initialPrompt: 'Continued from channel mention',
         source: 'discord' as SessionSource,
         workDir: ctWorkDir,
+        keepAlive: true,
       });
 
       const ctThreadInfo: ThreadSessionInfo = {

@@ -244,6 +244,7 @@ export async function handleMessageCommand(
     name: toolPolicy.sessionName,
     initialPrompt: message,
     source: 'discord' as SessionSource,
+    keepAlive: true,
   });
 
   const textWithContext = withAuthorContext(message, userId, username, channelId);

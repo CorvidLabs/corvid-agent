@@ -145,6 +145,7 @@ export async function handleSessionCommand(
     initialPrompt: topic,
     source: 'discord' as SessionSource,
     workDir,
+    keepAlive: true,
   });
 
   const threadInfo = {

@@ -371,6 +371,7 @@ export class TelegramBridge {
         name: `Telegram (user ${userId})`,
         initialPrompt: text,
         source,
+        keepAlive: true,
       });
 
       sessionId = session.id;

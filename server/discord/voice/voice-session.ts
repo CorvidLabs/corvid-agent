@@ -277,6 +277,7 @@ export class VoiceSessionRouter {
       initialPrompt: voicePrompt,
       source: 'discord' as SessionSource,
       workDir,
+      keepAlive: true,
     });
 
     this.processManager.startProcess(session, session.initialPrompt);

@@ -574,6 +574,7 @@ async function handleMentionReply(
     initialPrompt: cleanText,
     source: 'discord' as SessionSource,
     workDir,
+    keepAlive: true,
   });
 
   const agentName = agent.name;
@@ -947,6 +948,7 @@ async function resumeExpiredThreadSession(
     initialPrompt: text,
     source: 'discord' as SessionSource,
     workDir,
+    keepAlive: true,
   });
 
   const threadInfo = {
