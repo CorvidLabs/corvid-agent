@@ -42,7 +42,7 @@ import { startDirectProcess, summarizeConversation } from './direct-process';
 import { SessionEventBus } from './event-bus';
 import { McpServiceContainer, type McpServices } from './mcp-service-container';
 import { OwnerQuestionManager } from './owner-question-manager';
-import { type SdkProcess, type TurnCompleteMetrics, startSdkProcess } from './sdk-process';
+import { type SdkProcess, startSdkProcess, type TurnCompleteMetrics } from './sdk-process';
 import { resolveSessionConfig } from './session-config-resolver';
 import { MAX_RESTARTS, SessionResilienceManager } from './session-resilience-manager';
 import { SessionTimerManager } from './session-timer-manager';
@@ -662,7 +662,10 @@ export class ProcessManager {
         conversationOnly: isNoTools || conversationOnly,
         toolAllowList: isRestrictedTools ? toolAllowList : undefined,
         keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
-        onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+        onTurnComplete:
+          session.keepAlive || KEEP_ALIVE_ENABLED
+            ? (metrics) => this.handleTurnComplete(session.id, metrics)
+            : undefined,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1253,7 +1256,10 @@ export class ProcessManager {
           conversationOnly: isConversationOnly,
           toolAllowList: resumeToolAllowList,
           keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
-          onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+          onTurnComplete:
+            session.keepAlive || KEEP_ALIVE_ENABLED
+              ? (metrics) => this.handleTurnComplete(session.id, metrics)
+              : undefined,
         });
       }
     } catch (err) {
@@ -1836,10 +1842,17 @@ export class ProcessManager {
       if (messages.length === 0) return null;
 
       const contextWindow = getContextBudget(agent?.model);
-      const estimatedTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+      const messageTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+      // Stored messages only capture user/assistant text — add overhead for system prompt,
+      // CLAUDE.md, MCP tool definitions, and tool call/result content not stored in DB.
+      // Empirically ~15-25k tokens; scale with message count for tool-heavy sessions.
+      const SYSTEM_PROMPT_OVERHEAD = 12_000;
+      const TOOL_OVERHEAD_PER_MSG = 50;
+      const estimatedTokens = messageTokens + SYSTEM_PROMPT_OVERHEAD + messages.length * TOOL_OVERHEAD_PER_MSG;
       const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
       log.debug('Computed fallback context usage from conversation history', {
         sessionId: sessionId.slice(0, 8),
+        messageTokens,
         estimatedTokens,
         contextWindow,
         usagePercent: usagePercent.toFixed(1),
@@ -2107,6 +2120,8 @@ export class ProcessManager {
       costUsd: metrics.totalCostUsd,
       durationMs: metrics.durationMs,
       numTurns: metrics.numTurns,
+      inputTokens: metrics.inputTokens,
+      contextWindow: metrics.contextWindow,
     });
 
     // Mark session idle in DB — the process is warm but waiting for input
@@ -2117,6 +2132,32 @@ export class ProcessManager {
 
     // Clear the normal inactivity timeout — warm processes use keep-alive TTL instead
     this.timerManager.clearSessionTimeout(sessionId);
+
+    // Update context token tracking — SDK metrics if available, otherwise fallback
+    const meta = this.sessionMeta.get(sessionId);
+    if (metrics.inputTokens && metrics.contextWindow) {
+      const usagePercent = Math.round((metrics.inputTokens / metrics.contextWindow) * 100);
+      updateSessionContextTokens(this.db, sessionId, metrics.inputTokens, metrics.contextWindow);
+      if (meta) meta.lastContextUsagePercent = usagePercent;
+      this.eventBus.emit(sessionId, {
+        type: 'context_usage',
+        session_id: sessionId,
+        estimatedTokens: metrics.inputTokens,
+        contextWindow: metrics.contextWindow,
+        usagePercent,
+      } as ClaudeStreamEvent);
+    } else {
+      const fallback = this.computeFallbackContextUsage(sessionId);
+      if (fallback) {
+        updateSessionContextTokens(this.db, sessionId, fallback.estimatedTokens, fallback.contextWindow);
+        if (meta) meta.lastContextUsagePercent = fallback.usagePercent;
+        this.eventBus.emit(sessionId, {
+          type: 'context_usage',
+          session_id: sessionId,
+          ...fallback,
+        } as ClaudeStreamEvent);
+      }
+    }
 
     this.eventBus.emit(sessionId, {
       type: 'system',
