@@ -211,7 +211,14 @@ export class PSKDiscoveryPoller {
               }
 
               break;
-            } catch {}
+            } catch (decryptErr) {
+              // Expected: wrong PSK for this contact — try next
+              log.debug('PSK trial-decrypt failed', {
+                contactId: contact.id,
+                txid: tx.id?.slice(0, 12),
+                error: decryptErr instanceof Error ? decryptErr.message : String(decryptErr),
+              });
+            }
           }
         }
       } while (nextToken);
