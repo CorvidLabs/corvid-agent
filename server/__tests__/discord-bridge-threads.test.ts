@@ -102,7 +102,7 @@ describe('DiscordBridge thread subscription dedup', () => {
       expect(pm.subscribe).toHaveBeenCalledTimes(1);
       expect(pm.unsubscribe).not.toHaveBeenCalled();
 
-      // Second message — should unsubscribe old callback then re-subscribe
+      // Second message — same session, should reuse existing callback (no re-subscribe)
       await (bridge as unknown as { handleMessage: (msg: unknown) => Promise<void> }).handleMessage({
         id: '200000000000000011',
         channel_id: '400000000000000001',
@@ -111,10 +111,10 @@ describe('DiscordBridge thread subscription dedup', () => {
         timestamp: new Date().toISOString(),
       });
 
-      // unsubscribe called once (for the first callback)
-      expect(pm.unsubscribe).toHaveBeenCalledTimes(1);
-      // subscribe called twice total (once per message)
-      expect(pm.subscribe).toHaveBeenCalledTimes(2);
+      // No unsubscribe — existing callback handles both messages
+      expect(pm.unsubscribe).not.toHaveBeenCalled();
+      // subscribe called once (first message only; second reuses the active callback)
+      expect(pm.subscribe).toHaveBeenCalledTimes(1);
     } finally {
       cleanup();
     }
@@ -183,10 +183,10 @@ describe('DiscordBridge thread subscription dedup', () => {
         timestamp: new Date().toISOString(),
       });
 
-      // After second message, callback should be replaced
+      // After second message, callback should be the SAME (same session = reuse, not replace)
       expect(tsm.threadCallbacks.has('500000000000000001')).toBe(true);
       const secondCallback = tsm.threadCallbacks.get('500000000000000001')!.callback;
-      expect(secondCallback).not.toBe(firstCallback);
+      expect(secondCallback).toBe(firstCallback);
     } finally {
       cleanup();
     }

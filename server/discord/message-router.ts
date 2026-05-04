@@ -1163,19 +1163,26 @@ async function routeToThread(
     return;
   }
 
-  subscribeForResponseWithEmbed(
-    ctx.processManager,
-    ctx.delivery,
-    ctx.config.botToken,
-    ctx.db,
-    ctx.threadCallbacks,
-    sessionId,
-    threadId,
-    agentName,
-    agentModel,
-    projectName,
-    displayColor,
-    displayIcon,
-    avatarUrl,
-  );
+  // Only re-subscribe if no active callback exists for this thread+session.
+  // When a callback is already listening, re-subscribing causes a race condition:
+  // the replacement callback's result handler fires on the FIRST turn's completion
+  // and unsubscribes itself, dropping all subsequent turns' responses.
+  const existingCb = ctx.threadCallbacks.get(threadId);
+  if (!existingCb || existingCb.sessionId !== sessionId) {
+    subscribeForResponseWithEmbed(
+      ctx.processManager,
+      ctx.delivery,
+      ctx.config.botToken,
+      ctx.db,
+      ctx.threadCallbacks,
+      sessionId,
+      threadId,
+      agentName,
+      agentModel,
+      projectName,
+      displayColor,
+      displayIcon,
+      avatarUrl,
+    );
+  }
 }

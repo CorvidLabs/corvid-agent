@@ -47,9 +47,10 @@ export function subscribeForResponseWithEmbed(
   displayIcon?: string | null,
   avatarUrl?: string | null,
 ): void {
-  // Unsubscribe the previous callback for this thread to prevent duplicates
+  // Dispose the previous callback's timers and unsubscribe to prevent zombie timers / duplicates
   const prev = threadCallbacks.get(threadId);
   if (prev) {
+    prev.dispose?.();
     processManager.unsubscribe(prev.sessionId, prev.callback);
   }
 
@@ -711,6 +712,15 @@ export function subscribeForResponseWithEmbed(
     }
   };
 
+  const dispose = () => {
+    clearTyping();
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    flush();
+  };
+
   processManager.subscribe(sessionId, callback);
-  threadCallbacks.set(threadId, { sessionId, callback });
+  threadCallbacks.set(threadId, { sessionId, callback, dispose });
 }
