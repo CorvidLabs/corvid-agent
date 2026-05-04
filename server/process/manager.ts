@@ -1427,9 +1427,7 @@ export class ProcessManager {
     const logLevel = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
     if (process.env.LOG_TOKEN_BREAKDOWN === 'true' || logLevel === 'debug') {
       const summaryTokens = meta?.contextSummary ? estimateTokens(meta.contextSummary) : 0;
-      const obsText = observations
-        .map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`)
-        .join('\n');
+      const obsText = observations.map((o) => `- [${o.source}] (score: ${o.relevanceScore.toFixed(1)}) ${o.content}`).join('\n');
       const obsTokens = estimateTokens(obsText);
       const historyText = historyLines.join('\n');
       const historyTokens = estimateTokens(historyText);
