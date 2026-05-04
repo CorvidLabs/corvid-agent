@@ -5,13 +5,13 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
   agentColor,
-  buildActionRow,
-  buildAgentAuthor,
-  buildFooterText,
+  CorvidEmbed,
   type ContextUsage,
   collapseCodeBlocks,
   type DiscordFileAttachment,
+  type EmbedAgentIdentity,
   editEmbed,
+  type FooterContext,
   hexColorToInt,
   sendEmbed,
   sendEmbedWithButtons,
@@ -19,7 +19,6 @@ import {
   sendReplyEmbed,
   sendTypingIndicator,
 } from '../embeds';
-import { ButtonStyle } from '../types';
 import { visibleEmbedParts } from './utils';
 
 const log = createLogger('DiscordThreadManager');
@@ -55,7 +54,8 @@ export function subscribeForAdaptiveInlineResponse(
   const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
   let receivedAnyActivity = false;
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
-  const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
+  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName };
+  const authorIdentity: EmbedAgentIdentity = { agentName, displayIcon, avatarUrl };
 
   // Progress embed state — only created when tool use is detected
   let progressMessageId: string | null = null;
@@ -68,10 +68,11 @@ export function subscribeForAdaptiveInlineResponse(
       clearTyping();
       log.warn('Process died while typing indicator active (adaptive)', { sessionId, channelId });
       if (!receivedAnyContent) {
-        sendEmbed(delivery, botToken, channelId, {
-          description: 'The agent session ended unexpectedly. Send a message to start a new session.',
-          color: 0xff3355,
-        }).catch((err) => {
+        const { embed: crashEmbed } = new CorvidEmbed()
+          .setDescription('The agent session ended unexpectedly. Send a message to start a new session.')
+          .setColor(0xff3355)
+          .build();
+        sendEmbed(delivery, botToken, channelId, crashEmbed).catch((err) => {
           log.warn('Failed to send crash embed', {
             channelId,
             error: err instanceof Error ? err.message : String(err),
@@ -92,10 +93,13 @@ export function subscribeForAdaptiveInlineResponse(
     clearInterval(typingInterval);
     log.warn('Typing indicator safety timeout reached (adaptive)', { sessionId, channelId });
     if (!receivedAnyActivity) {
-      sendEmbed(delivery, botToken, channelId, {
-        description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
-        color: 0xf0b232,
-      }).catch((err) => {
+      const { embed: timeoutEmbed } = new CorvidEmbed()
+        .setDescription(
+          'The agent appears to be taking too long. It may still be working — send a message to check.',
+        )
+        .setColor(0xf0b232)
+        .build();
+      sendEmbed(delivery, botToken, channelId, timeoutEmbed).catch((err) => {
         log.warn('Failed to send timeout embed', {
           channelId,
           error: err instanceof Error ? err.message : String(err),
@@ -117,12 +121,15 @@ export function subscribeForAdaptiveInlineResponse(
     const parts = visibleEmbedParts(text);
     for (let i = 0; i < parts.length; i++) {
       let sentId: string | null = null;
-      const embedPayload = {
-        description: parts[i],
-        color,
-        author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
-      };
+      const contentBuilder = new CorvidEmbed()
+        .setDescription(parts[i])
+        .setColor(color)
+        .setAgent(authorIdentity)
+        .setModel(agentModel)
+        .setSession(sessionId);
+      if (projectName) contentBuilder.setProject(projectName);
+      if (latestContextUsage) contentBuilder.withContextUsage(latestContextUsage);
+      const { embed: embedPayload } = contentBuilder.build();
       if (i === 0) {
         sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
         // Fall back to non-reply if the referenced message no longer exists
@@ -143,17 +150,10 @@ export function subscribeForAdaptiveInlineResponse(
   const upgradeToProgressMode = () => {
     if (progressMode) return;
     progressMode = true;
-    sendEmbed(delivery, botToken, channelId, {
-      description: 'Working on your request...',
-      color: 0x5865f2,
-      author,
-      footer: {
-        text: buildFooterText(
-          { agentName, agentModel, sessionId, projectName, status: 'starting...' },
-          latestContextUsage,
-        ),
-      },
-    })
+    const progressBuilder = CorvidEmbed.progress(footerCtx, authorIdentity);
+    if (latestContextUsage) progressBuilder.withContextUsage(latestContextUsage);
+    const { embed: progressEmbed } = progressBuilder.build();
+    sendEmbed(delivery, botToken, channelId, progressEmbed)
       .then((msgId) => {
         progressMessageId = msgId;
       })
@@ -185,18 +185,16 @@ export function subscribeForAdaptiveInlineResponse(
               : 'png';
       const filename = `image.${ext}`;
       const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
-      await sendEmbedWithFiles(
-        delivery,
-        botToken,
-        channelId,
-        {
-          image: { url: `attachment://${filename}` },
-          color,
-          author,
-          footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
-        },
-        [attachment],
-      );
+      const imgBuilder = new CorvidEmbed()
+        .setImage(`attachment://${filename}`)
+        .setColor(color)
+        .setAgent(authorIdentity)
+        .setModel(agentModel)
+        .setSession(sessionId);
+      if (projectName) imgBuilder.setProject(projectName);
+      if (latestContextUsage) imgBuilder.withContextUsage(latestContextUsage);
+      const { embed: imgEmbed } = imgBuilder.build();
+      await sendEmbedWithFiles(delivery, botToken, channelId, imgEmbed, [attachment]);
     } catch (err) {
       log.warn('Failed to send image to Discord', {
         imageUrl,
@@ -236,17 +234,10 @@ export function subscribeForAdaptiveInlineResponse(
         const now = Date.now();
         if (now - lastStatusTime >= STATUS_DEBOUNCE_MS && progressMessageId) {
           lastStatusTime = now;
-          editEmbed(delivery, botToken, channelId, progressMessageId, {
-            description: `\u23f3 ${statusText}`,
-            color: 0x5865f2,
-            author,
-            footer: {
-              text: buildFooterText(
-                { agentName, agentModel, sessionId, projectName, status: 'working...' },
-                latestContextUsage,
-              ),
-            },
-          }).catch((err) => {
+          const toolStatusBuilder = CorvidEmbed.toolStatus(statusText, footerCtx, authorIdentity);
+          if (latestContextUsage) toolStatusBuilder.withContextUsage(latestContextUsage);
+          const { embed: toolStatusEmbed } = toolStatusBuilder.build();
+          editEmbed(delivery, botToken, channelId, progressMessageId, toolStatusEmbed).catch((err) => {
             log.debug('Progress embed edit failed', {
               channelId,
               error: err instanceof Error ? err.message : String(err),
@@ -274,17 +265,10 @@ export function subscribeForAdaptiveInlineResponse(
         .then(() => {
           // Only mark progress embed as done if we upgraded to progress mode
           if (progressMode && progressMessageId) {
-            editEmbed(delivery, botToken, channelId, progressMessageId, {
-              description: '\u2705 Done',
-              color: 0x57f287,
-              author,
-              footer: {
-                text: buildFooterText(
-                  { agentName, agentModel, sessionId, projectName, status: 'done' },
-                  latestContextUsage,
-                ),
-              },
-            }).catch((err) => {
+            const doneBuilder = CorvidEmbed.done(footerCtx, authorIdentity);
+            if (latestContextUsage) doneBuilder.withContextUsage(latestContextUsage);
+            const { embed: doneEmbed } = doneBuilder.build();
+            editEmbed(delivery, botToken, channelId, progressMessageId, doneEmbed).catch((err) => {
               log.debug('Final progress embed edit failed', {
                 channelId,
                 error: err instanceof Error ? err.message : String(err),
@@ -294,24 +278,18 @@ export function subscribeForAdaptiveInlineResponse(
 
           // Offer "Continue in Thread" button so the user can move the conversation
           // out of the channel and into a dedicated thread (reduces channel spam).
-          sendEmbedWithButtons(
-            delivery,
-            botToken,
-            channelId,
-            {
-              description: 'Reply to continue here, or start a thread for a longer conversation.',
-              color: 0x95a5a6,
-              footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
-            },
-            [
-              buildActionRow({
-                label: 'Continue in Thread',
-                customId: `continue_thread:${sessionId}`,
-                style: ButtonStyle.PRIMARY,
-                emoji: '🧵',
-              }),
-            ],
-          ).catch((err) => {
+          const continueBuilder = new CorvidEmbed()
+            .setDescription('Reply to continue here, or start a thread for a longer conversation.')
+            .setColor(0x95a5a6)
+            .setAgent(authorIdentity)
+            .setModel(agentModel)
+            .setSession(sessionId)
+            .withButtons(['continue_thread'])
+            .withButtonOverride('continue_thread', `continue_thread:${sessionId}`);
+          if (projectName) continueBuilder.setProject(projectName);
+          if (latestContextUsage) continueBuilder.withContextUsage(latestContextUsage);
+          const { embed: continueEmbed, components } = continueBuilder.build();
+          sendEmbedWithButtons(delivery, botToken, channelId, continueEmbed, components!).catch((err) => {
             log.debug('Continue-in-thread embed failed', {
               channelId,
               error: err instanceof Error ? err.message : String(err),
@@ -333,61 +311,18 @@ export function subscribeForAdaptiveInlineResponse(
       const errEvent = event as { error?: { message?: string; errorType?: string } };
       const errorType = errEvent.error?.errorType || 'unknown';
 
-      let title: string;
-      let description: string;
-      let errColor: number;
-      switch (errorType) {
-        case 'context_exhausted':
-          title = 'Context Limit Reached';
-          description = 'The conversation ran out of context space. Send a message to start a new session.';
-          errColor = 0xf0b232;
-          break;
-        case 'credits_exhausted':
-          title = 'Credits Exhausted';
-          description = 'Session paused — credits have been used up. Add credits to resume.';
-          errColor = 0xf0b232;
-          break;
-        case 'spawn_error':
-          title = 'Failed to Start';
-          description = 'The agent session could not be started. This may be a configuration issue.';
-          errColor = 0xff3355;
-          break;
-        default:
-          title = 'Session Error';
-          description = (errEvent.error?.message || 'An unexpected error occurred.').slice(0, 4096);
-          errColor = 0xff3355;
-          break;
-      }
-
       // If we have a progress embed, update it with the error; otherwise send a new one
+      const errBuilder = CorvidEmbed.error(errorType, footerCtx, authorIdentity, errEvent.error?.message);
+      if (latestContextUsage) errBuilder.withContextUsage(latestContextUsage);
+
       if (progressMode && progressMessageId) {
-        editEmbed(delivery, botToken, channelId, progressMessageId, {
-          title,
-          description,
-          color: errColor,
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName, status: errorType },
-              latestContextUsage,
-            ),
-          },
-        }).catch((err) => {
+        const { embed: errEmbed } = errBuilder.build();
+        editEmbed(delivery, botToken, channelId, progressMessageId, errEmbed).catch((err) => {
           log.debug('Error embed edit failed', { channelId, error: err instanceof Error ? err.message : String(err) });
         });
       } else {
-        sendEmbed(delivery, botToken, channelId, {
-          title,
-          description,
-          color: errColor,
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName, status: errorType },
-              latestContextUsage,
-            ),
-          },
-        }).catch((err) => {
+        const { embed: errEmbed } = errBuilder.build();
+        sendEmbed(delivery, botToken, channelId, errEmbed).catch((err) => {
           log.debug('Error embed send failed', { channelId, error: err instanceof Error ? err.message : String(err) });
         });
       }

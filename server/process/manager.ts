@@ -70,7 +70,7 @@ const ZERO_TURN_CIRCUIT_BREAKER_THRESHOLD = 3;
 const AUTO_COMPACT_THRESHOLD = 90;
 
 /** Keep-alive TTL default in ms. Configurable via KEEP_ALIVE_TTL_MS env var. */
-const KEEP_ALIVE_TTL_MS = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10);
+const KEEP_ALIVE_TTL_MS = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(2 * 60 * 60 * 1000), 10);
 
 /** Whether keep-alive is globally enabled. Opt-in via KEEP_ALIVE_ENABLED env var. */
 const KEEP_ALIVE_ENABLED = process.env.KEEP_ALIVE_ENABLED === 'true';

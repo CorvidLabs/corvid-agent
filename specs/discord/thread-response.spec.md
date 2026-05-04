@@ -3,6 +3,7 @@ module: thread-response
 version: 1
 status: draft
 files:
+  - server/discord/embed-builder.ts
   - server/discord/thread-response/embed-response.ts
   - server/discord/thread-response/inline-response.ts
   - server/discord/thread-response/progress-response.ts
@@ -22,6 +23,18 @@ depends_on:
 Provides response subscription strategies for Discord conversations. Each strategy subscribes to agent process events and delivers responses to Discord channels/threads using different UX patterns (rich embeds, inline replies, edit-in-place progress, or adaptive). Also includes recovery logic for reconnecting subscriptions after server restart and shared utility functions.
 
 ## Public API
+
+### Exported Classes (embed-builder.ts)
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `CorvidEmbed` | `class` | Chainable builder for Discord embeds with auto-constructed footers, author blocks, and button rows. Static preset factories: progress, toolStatus, warm, done, completion, crash, error, timeout, workTaskQueued, workTaskStatus, workTaskCompleted, workTaskFailed. |
+| `EMBED_COLORS` | `const` | Canonical color palette: neutral (0x95a5a6), working (0x5865f2), success (0x57f287), warning (0xf0b232), error (0xff3355), errorAlt (0xed4245) |
+| `EMBED_BUTTONS` | `const` | Button definitions: new_session, archive, create_issue, resume, continue_thread |
+| `EmbedAgentIdentity` | `interface` | Agent identity for building embed author blocks (agentName, displayIcon?, avatarUrl?) |
+| `EmbedButtonKey` | `type` | Union type of valid button keys from EMBED_BUTTONS |
+| `ButtonDef` | `interface` | Shape of a button definition (label, emoji, customId, style) |
+| `BuiltEmbed` | `interface` | Return type of CorvidEmbed.build() — { embed: DiscordEmbed, components?: DiscordActionRow[] } |
 
 ### Exported Functions (embed-response.ts)
 

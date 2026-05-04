@@ -227,6 +227,16 @@ Bidirectional Discord bridge using the raw Discord Gateway WebSocket API (v10). 
 | `sendEmbedWithFiles` | `(delivery, botToken, channelId, embed, files)` | `Promise<string \| null>` | Send an embed with file attachments via multipart/form-data |
 | `sendMessageWithFiles` | `(delivery, botToken, channelId, content, files)` | `Promise<string \| null>` | Send a text message with file attachments via multipart/form-data |
 
+### Re-exported from embed-builder.ts (via embeds.ts)
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `CorvidEmbed` | `class` | Chainable builder for Discord embeds with auto-constructed footers, author blocks, and button rows. Includes static preset factories for common embed types. |
+| `EMBED_COLORS` | `const` | Canonical color palette: neutral, working, success, warning, error, errorAlt |
+| `EMBED_BUTTONS` | `const` | Button definitions: new_session, archive, create_issue, resume, continue_thread |
+| `EmbedAgentIdentity` | `interface` | Agent identity for building embed author blocks (agentName, displayIcon?, avatarUrl?) |
+| `EmbedButtonKey` | `type` | Union of valid button keys from EMBED_BUTTONS |
+
 ### Exported Functions (from message-router.ts)
 
 | Function | Parameters | Returns | Description |
