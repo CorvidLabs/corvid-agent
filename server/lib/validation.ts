@@ -266,11 +266,13 @@ export const CreateSessionSchema = z.object({
   initialPrompt: z.string().optional(),
   councilLaunchId: z.string().optional(),
   councilRole: z.enum(['member', 'reviewer', 'chairman', 'discusser']).optional(),
+  keepAlive: z.boolean().optional(),
 });
 
 export const UpdateSessionSchema = z.object({
   name: z.string().optional(),
   status: z.enum(['idle', 'loading', 'running', 'paused', 'stopped', 'error']).optional(),
+  keepAlive: z.boolean().optional(),
 });
 
 export const ResumeSessionSchema = z

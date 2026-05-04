@@ -104,7 +104,12 @@ interface SessionGroup {
                                    [class.session-table__row--running]="session.status === 'running' || session.status === 'loading'">
                                     <span class="session-table__name" [title]="sessionDisplayName(session)">{{ sessionDisplayName(session) }}</span>
                                     <span class="session-table__agent" [title]="getAgentName(session.agentId)">{{ getAgentName(session.agentId) }}</span>
-                                    <span><app-status-badge [status]="session.status" /></span>
+                                    <span>
+                                        <app-status-badge [status]="session.status" />
+                                        @if (session.keepAlive && session.status === 'idle') {
+                                            <span class="warm-badge" title="Process warm — instant resume">warm</span>
+                                        }
+                                    </span>
                                     <span class="session-table__cost">\${{ session.totalCostUsd | number:'1.2-4' }}</span>
                                     <span class="session-table__source">{{ session.source }}</span>
                                     <span class="session-table__time" [title]="session.updatedAt | absoluteTime">{{ session.updatedAt | relativeTime }}</span>
@@ -167,6 +172,13 @@ interface SessionGroup {
             display: block; width: 100%; margin-top: 0.5rem;
             color: var(--accent-cyan); font-size: 0.75rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        .warm-badge {
+            display: inline-block; margin-left: 4px; padding: 1px 5px;
+            border-radius: var(--radius-sm); font-size: 0.6rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em;
+            background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid var(--accent-amber-border);
         }
 
         @media (max-width: 767px) {

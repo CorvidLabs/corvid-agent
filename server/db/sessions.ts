@@ -31,6 +31,7 @@ interface SessionRow {
   council_role: string | null;
   work_dir: string | null;
   credits_consumed: number;
+  keep_alive: number;
   last_context_tokens: number | null;
   last_context_window: number | null;
   created_at: string;
@@ -72,6 +73,7 @@ function rowToSession(row: SessionRow): Session {
     councilRole: (row.council_role as Session['councilRole']) ?? null,
     workDir: row.work_dir ?? null,
     creditsConsumed: row.credits_consumed ?? 0,
+    keepAlive: row.keep_alive === 1,
     lastContextTokens: row.last_context_tokens ?? null,
     lastContextWindow: row.last_context_window ?? null,
     createdAt: row.created_at,
@@ -129,8 +131,8 @@ export function createSession(db: Database, input: CreateSessionInput, tenantId:
   const initialStatus = source === 'agent' ? 'loading' : 'idle';
 
   db.query(
-    `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, status, council_launch_id, council_role, work_dir, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO sessions (id, project_id, agent_id, name, source, initial_prompt, status, council_launch_id, council_role, work_dir, keep_alive, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.projectId ?? null,
@@ -142,6 +144,7 @@ export function createSession(db: Database, input: CreateSessionInput, tenantId:
     input.councilLaunchId ?? null,
     input.councilRole ?? null,
     input.workDir ?? null,
+    input.keepAlive ? 1 : 0,
     tenantId,
   );
 
@@ -175,6 +178,10 @@ export function updateSession(
   if (input.status !== undefined) {
     fields.push('status = ?');
     values.push(input.status);
+  }
+  if (input.keepAlive !== undefined) {
+    fields.push('keep_alive = ?');
+    values.push(input.keepAlive ? 1 : 0);
   }
 
   if (fields.length === 0) return existing;

@@ -1250,8 +1250,8 @@ export class ProcessManager {
           externalMcpConfigs: resumeExternalMcpConfigs,
           conversationOnly: isConversationOnly,
           toolAllowList: resumeToolAllowList,
-          keepAlive: KEEP_ALIVE_ENABLED,
-          onTurnComplete: KEEP_ALIVE_ENABLED ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
+          keepAlive: session.keepAlive || KEEP_ALIVE_ENABLED,
+          onTurnComplete: (session.keepAlive || KEEP_ALIVE_ENABLED) ? (metrics) => this.handleTurnComplete(session.id, metrics) : undefined,
         });
       }
     } catch (err) {
@@ -1331,6 +1331,7 @@ export class ProcessManager {
     } as ClaudeStreamEvent);
 
     this.finalizeTokenTracking(sessionId);
+    this.timerManager.clearKeepAliveTtl(sessionId);
     cp.kill();
     this.processes.delete(sessionId);
     updateSessionPid(this.db, sessionId, null);
@@ -1622,6 +1623,7 @@ export class ProcessManager {
       this.timerManager.clearKeepAliveTtl(sessionId);
       // Restart normal session inactivity timeout since process is now active
       this.timerManager.startSessionTimeout(sessionId);
+      updateSessionStatus(this.db, sessionId, 'running');
     }
 
     // Persist as text for session history (extract text from multimodal content)
@@ -2104,6 +2106,9 @@ export class ProcessManager {
       durationMs: metrics.durationMs,
       numTurns: metrics.numTurns,
     });
+
+    // Mark session idle in DB — the process is warm but waiting for input
+    updateSessionStatus(this.db, sessionId, 'idle');
 
     // Start keep-alive TTL — process will be killed if no new message arrives
     this.timerManager.startKeepAliveTtl(sessionId, KEEP_ALIVE_TTL_MS);

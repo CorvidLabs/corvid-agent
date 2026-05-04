@@ -17,6 +17,7 @@ export interface Session {
   councilRole: 'member' | 'reviewer' | 'chairman' | 'discusser' | null;
   workDir: string | null;
   creditsConsumed: number;
+  keepAlive: boolean;
   lastContextTokens: number | null;
   lastContextWindow: number | null;
   createdAt: string;
@@ -50,9 +51,12 @@ export interface CreateSessionInput {
   toolAccessPolicy?: ToolAccessPolicy;
   /** Specific expensive tools to enable even under standard/restricted policy. */
   allowedExpensiveTools?: string[];
+  /** Enable keep-alive for this session (process stays warm between turns). */
+  keepAlive?: boolean;
 }
 
 export interface UpdateSessionInput {
   name?: string;
   status?: SessionStatus;
+  keepAlive?: boolean;
 }

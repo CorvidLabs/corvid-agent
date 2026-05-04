@@ -6,6 +6,7 @@ files:
   - server/db/sessions.ts
   - server/db/migrations/115_algochat_unique_participant.ts
   - server/db/migrations/125_cumulative_turns.ts
+  - server/db/migrations/127_session_keep_alive.ts
 db_tables:
   - sessions
   - session_messages
@@ -71,6 +72,13 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `cumulative_turns` column to sessions table (guarded by PRAGMA table_info), backfills from `total_turns` |
+| `down` | `(_db: Database)` | `void` | No-op (column addition is not reversed) |
+
+### Exported Migration Functions — `server/db/migrations/127_session_keep_alive.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `keep_alive` column to sessions table (guarded by PRAGMA table_info) |
 | `down` | `(_db: Database)` | `void` | No-op (column addition is not reversed) |
 
 ## Invariants
@@ -158,6 +166,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | total_algo_spent | REAL | DEFAULT 0 | Cumulative microALGOs spent |
 | total_turns | INTEGER | DEFAULT 0 | Number of conversation turns (resets on context compaction) |
 | cumulative_turns | INTEGER | DEFAULT 0 | Total turns across all context windows (never resets) |
+| keep_alive | INTEGER | NOT NULL, DEFAULT 0 | Per-session keep-alive flag (boolean: 0=off, 1=on) |
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
 | council_role | TEXT | nullable | chairman/member/synthesizer |
 | work_dir | TEXT | nullable | Override working directory (e.g. git worktree) |
@@ -201,3 +210,4 @@ No environment variables. This module is a pure data layer.
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-05-01 | corvid-agent | Add cumulative_turns column, getSessionCumulativeTurns, incrementSessionCumulativeTurns (#2216) |
+| 2026-05-04 | corvid-agent | Add keep_alive column for per-session keep-alive flag (Phase 3) |
