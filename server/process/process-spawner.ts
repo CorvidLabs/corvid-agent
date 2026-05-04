@@ -427,6 +427,13 @@ export function releaseEphemeralDir(deps: Pick<ProcessSpawnerDeps, 'ephemeralDir
  * or done — the caller must fall back to coldStartProcess().
  *
  * This is a stub for the session keep-alive implementation (#2224).
+ *
+ * NOTE — metadata update gap (#2225): The spec (§"Warm-start Spawn Path, step 3")
+ * requires resetting `lastActivityAt` and incrementing `turnCount` here. Currently,
+ * manager.ts handles both updates inside `sendMessage()` for warm turns. When
+ * manager.ts is wired to call `warmStartProcess()` directly (pending governance
+ * approval for the Layer 0 change in #2225), this stub must be extended with those
+ * metadata updates so the spec invariant is satisfied at the spawner level.
  */
 export async function warmStartProcess(deps: ProcessSpawnerDeps, session: Session, message: string): Promise<boolean> {
   const proc = deps.processes.get(session.id);
