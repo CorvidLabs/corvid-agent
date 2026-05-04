@@ -62,8 +62,8 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 
 ## Invariants
 
-1. Sessions in `'running'` or `'waiting'` status are never cleaned up by automated expiration or limit enforcement. Both states represent live processes that must not be killed by the lifecycle manager — only the ProcessManager's inactivity timeout (2h) may terminate a `waiting` session. Sessions in `'paused'` status are protected from TTL expiration but are subject to per-project limit enforcement if older than 24 hours.
-2. Session TTL expiration only applies to sessions in terminal states (`'idle'`, `'completed'`, `'error'`, `'stopped'`). The `waiting` state is non-terminal — the process is alive and may resume at any moment — so it is excluded from TTL expiration.
+1. Sessions in `'running'` status are never cleaned up by automated expiration or limit enforcement. Sessions in `'paused'` status are protected from TTL expiration but are subject to per-project limit enforcement if older than 24 hours.
+2. Session TTL expiration only applies to sessions in terminal states (`'idle'`, `'completed'`, `'error'`, `'stopped'`).
 3. Per-project session limit enforcement deletes the oldest non-`'running'` sessions first (including `'paused'`), but only those older than 24 hours. Sessions younger than 24 hours are protected from limit-based cleanup to prevent a burst of new sessions from evicting recently-created sessions that users still expect to be resumable.
 4. All session deletions cascade within a transaction: `algochat_conversations` FK nullified, `session_messages` deleted, `escalation_queue` entries deleted, then the session row itself.
 5. The cleanup timer is idempotent: calling `start()` when already running logs a warning and does not create a duplicate timer.
@@ -86,20 +86,6 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 - **Given** `maxSessionsPerProject` is 100 and project `"proj-1"` has 110 non-running sessions, but 15 of the oldest are younger than 24 hours
 - **When** `runCleanup` executes
 - **Then** only sessions older than 24 hours are deleted; younger sessions are preserved even though the project remains over the limit
-
-### Scenario: Waiting session protected from TTL expiration
-
-- **Given** the SessionLifecycleManager is started with a 7-day TTL
-- **When** the periodic cleanup runs and finds a session in `'waiting'` status last updated 10 days ago
-- **Then** that session is NOT expired — it has a live process and is protected by invariant #1
-- **And** only the ProcessManager's 2-hour inactivity timeout (not the lifecycle TTL) can terminate it
-
-### Scenario: Waiting session excluded from per-project limit enforcement
-
-- **Given** `maxSessionsPerProject` is 100 and project `"proj-1"` has 105 sessions: 100 idle + 5 waiting
-- **When** `runCleanup` executes
-- **Then** the 5 `waiting` sessions are excluded from limit enforcement
-- **And** only idle sessions older than 24 hours are candidates for deletion
 
 ### Scenario: Session creation gating
 - **Given** project `"proj-1"` has 100 sessions
@@ -143,4 +129,3 @@ Manages automated session cleanup, TTL-based expiration, per-project session lim
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-18 | corvid-agent | v3: Removed protected-paths exports (now in dedicated `protected-paths.spec.md`). Added 24-hour minimum age guard to `enforceSessionLimits`. Fixes #1221 |
-| 2026-05-02 | Jackdaw | Session keep-alive: `waiting` status protected from TTL expiration and limit enforcement (same as `running`). Invariants 1-2 updated, behavioral examples added (#2233) |
