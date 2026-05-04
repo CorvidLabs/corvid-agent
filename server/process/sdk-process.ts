@@ -31,7 +31,7 @@ const log = createLogger('SdkProcess');
  * Stays open until explicitly closed, preventing the SDK from calling
  * endInput() on the CLI process stdin.
  */
-class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterator<SDKUserMessage> {
+export class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterator<SDKUserMessage> {
   private queue: SDKUserMessage[] = [];
   private waiting: ((result: IteratorResult<SDKUserMessage>) => void) | null = null;
   private closed = false;

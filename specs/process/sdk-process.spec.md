@@ -84,6 +84,12 @@ start() ──→ [processing] ──→ model turn complete ──→ [warm]
 | `isApiError` | `(error: string)` | `boolean` | Check if an error string matches known API error patterns |
 | `mapSdkMessageToEvent` | `(message: SDKMessage, sessionId: string)` | `ClaudeStreamEvent \| null` | Convert an SDK message to a stream event for the event bus |
 
+### Exported Classes
+
+| Class | Implements | Description |
+|-------|-----------|-------------|
+| `MessageQueue` | `AsyncIterable<SDKUserMessage>`, `AsyncIterator<SDKUserMessage>` | Persistent async message queue for keep-alive sessions. Keeps stdin open so the SDK does not call `endInput()` after the first turn. Messages are enqueued via `enqueue()` and consumed by the SDK's `streamInput()`. Call `close()` on session teardown |
+
 ## Invariants
 
 1. **Protected file enforcement**: `canUseTool` blocks `Write`, `Edit`, `MultiEdit` on protected paths and `Bash` commands with write operators targeting protected paths. This runs BEFORE bypass mode checks — even `full-auto` agents cannot modify protected files
