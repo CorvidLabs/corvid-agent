@@ -46,38 +46,38 @@ describe('assertInteractionToken', () => {
 });
 
 describe('buildFooterText', () => {
-  test('includes all context segments', () => {
+  test('includes model, session, and status (no agent name or project)', () => {
     const result = buildFooterText({
       agentName: 'Corvid',
-      agentModel: 'opus',
+      agentModel: 'claude-opus-4-6',
       projectName: 'my-project',
       sessionId: 'abcdef1234567890',
       status: 'running',
     });
-    expect(result).toBe('Corvid · opus · my-project · sid:abcdef12 · running');
+    expect(result).toBe('opus-4.6 · abcdef12 · running');
   });
 
-  test('returns agent name and model when no other context', () => {
-    const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' });
-    expect(result).toBe('Corvid · opus');
+  test('returns shortened model when no other context', () => {
+    const result = buildFooterText({ agentName: 'Corvid', agentModel: 'claude-opus-4-6' });
+    expect(result).toBe('opus-4.6');
   });
 
-  test('includes projectName', () => {
+  test('omits projectName from footer', () => {
     const result = buildFooterText({
       agentName: 'Corvid',
       agentModel: 'opus',
       projectName: 'my-project',
     });
-    expect(result).toBe('Corvid · opus · my-project');
+    expect(result).toBe('opus');
   });
 
-  test('includes sessionId as truncated sid:', () => {
+  test('includes sessionId without sid: prefix', () => {
     const result = buildFooterText({
       agentName: 'Corvid',
       agentModel: 'opus',
       sessionId: 'abcdef1234567890',
     });
-    expect(result).toBe('Corvid · opus · sid:abcdef12');
+    expect(result).toBe('opus · abcdef12');
   });
 
   test('includes status', () => {
@@ -86,7 +86,7 @@ describe('buildFooterText', () => {
       agentModel: 'opus',
       status: 'completed',
     });
-    expect(result).toBe('Corvid · opus · completed');
+    expect(result).toBe('opus · completed');
   });
 
   test('works without agentModel', () => {
@@ -94,22 +94,32 @@ describe('buildFooterText', () => {
       agentName: 'Corvid',
       status: 'done',
     });
-    expect(result).toBe('Corvid · done');
+    expect(result).toBe('done');
+  });
+
+  test('shortens claude model names', () => {
+    expect(buildFooterText({ agentName: 'X', agentModel: 'claude-opus-4-6' })).toBe('opus-4.6');
+    expect(buildFooterText({ agentName: 'X', agentModel: 'claude-sonnet-4-6' })).toBe('sonnet-4.6');
+    expect(buildFooterText({ agentName: 'X', agentModel: 'claude-haiku-4-5' })).toBe('haiku-4.5');
+  });
+
+  test('passes through non-claude model names unchanged', () => {
+    expect(buildFooterText({ agentName: 'X', agentModel: 'gpt-4o' })).toBe('gpt-4o');
   });
 
   test('shows T:x(n) when cumulative turns exceed active turns', () => {
     const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5, 23);
-    expect(result).toBe('Corvid · opus | T:5(23)');
+    expect(result).toBe('opus | T:5(23)');
   });
 
   test('shows T:x when cumulative equals active turns', () => {
     const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5, 5);
-    expect(result).toBe('Corvid · opus | T:5');
+    expect(result).toBe('opus | T:5');
   });
 
   test('shows T:x when no cumulative turns provided', () => {
     const result = buildFooterText({ agentName: 'Corvid', agentModel: 'opus' }, undefined, 5);
-    expect(result).toBe('Corvid · opus | T:5');
+    expect(result).toBe('opus | T:5');
   });
 });
 
@@ -119,7 +129,7 @@ describe('buildFooterWithStats', () => {
       { agentName: 'Corvid', agentModel: 'opus', sessionId: 'abcdef1234567890', status: 'done' },
       { filesChanged: 5, turns: 12, commits: 3 },
     );
-    expect(result).toBe('Corvid · opus · sid:abcdef12 · done | 5 files · 12 turns · 3 commits');
+    expect(result).toBe('opus · abcdef12 · done | 5 files · 12 turns · 3 commits');
   });
 
   test('omits zero stats', () => {
@@ -127,7 +137,7 @@ describe('buildFooterWithStats', () => {
       { agentName: 'Corvid', agentModel: 'opus', status: 'done' },
       { filesChanged: 0, turns: 8, commits: 0 },
     );
-    expect(result).toBe('Corvid · opus · done | 8 turns');
+    expect(result).toBe('opus · done | 8 turns');
   });
 
   test('returns base footer when all stats are zero', () => {
@@ -135,12 +145,12 @@ describe('buildFooterWithStats', () => {
       { agentName: 'Corvid', agentModel: 'opus', status: 'done' },
       { filesChanged: 0, turns: 0, commits: 0 },
     );
-    expect(result).toBe('Corvid · opus · done');
+    expect(result).toBe('opus · done');
   });
 
   test('includes tools stat', () => {
     const result = buildFooterWithStats({ agentName: 'Corvid', status: 'done' }, { turns: 3, tools: 15 });
-    expect(result).toBe('Corvid · done | 3 turns · 15 tools');
+    expect(result).toBe('done | 3 turns · 15 tools');
   });
 
   test('shows cumulative turns in stats when greater', () => {
@@ -150,12 +160,12 @@ describe('buildFooterWithStats', () => {
       undefined,
       23,
     );
-    expect(result).toBe('Corvid · done | 5 turns (23 total) · 10 tools');
+    expect(result).toBe('done | 5 turns (23 total) · 10 tools');
   });
 
   test('omits cumulative when equal to active', () => {
     const result = buildFooterWithStats({ agentName: 'Corvid', status: 'done' }, { turns: 5, tools: 10 }, undefined, 5);
-    expect(result).toBe('Corvid · done | 5 turns · 10 tools');
+    expect(result).toBe('done | 5 turns · 10 tools');
   });
 });
 

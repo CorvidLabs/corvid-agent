@@ -194,9 +194,16 @@ function formatTokenCount(tokens: number): string {
   return String(tokens);
 }
 
+function shortenModelName(model: string): string {
+  const m = model.match(/^claude-(\w+)-(\d+)-(\d+)$/);
+  if (m) return `${m[1]}-${m[2]}.${m[3]}`;
+  return model;
+}
+
 /**
- * Build a detailed footer string with full session context.
- * Format: `AgentName · model · project · sid:XXXXXX · status | T:5(23) | 🟢 32% (64k/200k)`
+ * Build a compact footer string with session context.
+ * Format: `opus-4.6 · XXXXXXXX · status | T:5(23) | 🟢 32% (64k/200k)`
+ * Agent name is in the embed author; project name is in the thread title — both omitted.
  * When cumulativeTurns equals active turns, shows just `T:5`.
  * Segments are omitted when their value is not provided.
  */
@@ -206,15 +213,12 @@ export function buildFooterText(
   turns?: number,
   cumulativeTurns?: number,
 ): string {
-  const parts: string[] = [ctx.agentName];
+  const parts: string[] = [];
   if (ctx.agentModel) {
-    parts.push(ctx.agentModel);
-  }
-  if (ctx.projectName) {
-    parts.push(ctx.projectName);
+    parts.push(shortenModelName(ctx.agentModel));
   }
   if (ctx.sessionId) {
-    parts.push(`sid:${ctx.sessionId.slice(0, 8)}`);
+    parts.push(ctx.sessionId.slice(0, 8));
   }
   if (ctx.status) {
     parts.push(ctx.status);
@@ -236,7 +240,7 @@ export function buildFooterText(
 
 /**
  * Build a footer with session context AND run stats.
- * Format: `AgentName · model · sid:XXXXXX · status | 5 files · 12 turns (23 total) · 38 tools | 🟢 32% (64k/200k)`
+ * Format: `opus-4.6 · XXXXXXXX · status | 5 files · 12 turns (23 total) · 38 tools | 🟢 32% (64k/200k)`
  */
 export function buildFooterWithStats(
   ctx: FooterContext,
