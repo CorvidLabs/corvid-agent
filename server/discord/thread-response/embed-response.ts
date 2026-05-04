@@ -7,13 +7,12 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
   agentColor,
-  buildActionRow,
-  buildAgentAuthor,
-  buildFooterText,
-  buildFooterWithStats,
   type ContextUsage,
   collapseCodeBlocks,
+  CorvidEmbed,
   type DiscordFileAttachment,
+  type EmbedAgentIdentity,
+  type FooterContext,
   editEmbed,
   hexColorToInt,
   sendEmbed,
@@ -23,8 +22,7 @@ import {
 } from '../embeds';
 import type { ThreadCallbackInfo } from '../thread-session-map';
 import { formatDuration, normalizeTimestamp } from '../thread-session-map';
-import { ButtonStyle } from '../types';
-import { sessionErrorEmbed, visibleEmbedParts } from './utils';
+import { visibleEmbedParts } from './utils';
 
 const log = createLogger('DiscordThreadManager');
 
@@ -69,7 +67,8 @@ export function subscribeForResponseWithEmbed(
   let latestContextUsage: ContextUsage | undefined;
 
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
-  const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
+  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName };
+  const authorIdentity: EmbedAgentIdentity = { agentName, displayIcon, avatarUrl };
 
   // Single progress message — created on first activity, edited in place for updates.
   // Eliminates message spam: instead of N status embeds, one embed is updated.
@@ -81,21 +80,11 @@ export function subscribeForResponseWithEmbed(
   });
 
   /** Post or upgrade the progress message. First call sends it, subsequent calls edit it. */
-  const updateProgressMessage = async (description: string, status: string, embedColor?: number) => {
+  const updateProgressEmbed = async (builder: CorvidEmbed) => {
     const t = getTurnInfo();
-    const embed = {
-      description,
-      color: embedColor ?? 0x95a5a6,
-      author,
-      footer: {
-        text: buildFooterText(
-          { agentName, agentModel, sessionId, projectName, status },
-          latestContextUsage,
-          t.active,
-          t.cumulative,
-        ),
-      },
-    };
+    if (latestContextUsage) builder.withContextUsage(latestContextUsage);
+    builder.withTurns(t.active, t.cumulative);
+    const { embed } = builder.build();
     if (progressMessageId) {
       await editEmbed(delivery, botToken, threadId, progressMessageId, embed);
     } else {
@@ -106,7 +95,7 @@ export function subscribeForResponseWithEmbed(
   // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a progress embed
   const ackTimer = setTimeout(() => {
     if (!receivedAnyContent && !sentErrorMessage) {
-      updateProgressMessage('Received — working on it...', 'thinking').catch((err) => {
+      updateProgressEmbed(CorvidEmbed.progress(footerCtx, authorIdentity)).catch((err) => {
         log.debug('Ack embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
       });
     }
@@ -120,7 +109,7 @@ export function subscribeForResponseWithEmbed(
       return;
     }
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    updateProgressMessage(`Still working (${elapsed}s elapsed)...`, 'working...').catch((err) => {
+    updateProgressEmbed(CorvidEmbed.toolStatus(`Still working (${elapsed}s elapsed)...`, footerCtx, authorIdentity)).catch((err) => {
       log.debug('Progress embed failed', { threadId, error: err instanceof Error ? err.message : String(err) });
     });
   }, PROGRESS_INTERVAL_MS);
@@ -136,20 +125,20 @@ export function subscribeForResponseWithEmbed(
         // If we have an existing progress message, update it to show the crash.
         // Otherwise send a new embed.
         if (progressMessageId) {
+          // Build the crash embed without buttons for editing in-place
+          const crashNoButtonBuilder = new CorvidEmbed()
+            .setDescription('The agent session ended unexpectedly. Send a message to resume.')
+            .setColor(0xff3355)
+            .setAgent(authorIdentity)
+            .setStatus('crashed')
+            .setModel(agentModel)
+            .setSession(sessionId);
+          if (projectName) crashNoButtonBuilder.setProject(projectName);
+          if (latestContextUsage) crashNoButtonBuilder.withContextUsage(latestContextUsage);
           const ct = getTurnInfo();
-          editEmbed(delivery, botToken, threadId, progressMessageId, {
-            description: 'The agent session ended unexpectedly. Send a message to resume.',
-            color: 0xff3355,
-            author,
-            footer: {
-              text: buildFooterText(
-                { agentName, agentModel, sessionId, projectName, status: 'crashed' },
-                latestContextUsage,
-                ct.active,
-                ct.cumulative,
-              ),
-            },
-          }).catch((err) => {
+          crashNoButtonBuilder.withTurns(ct.active, ct.cumulative);
+          const { embed: crashEmbed } = crashNoButtonBuilder.build();
+          editEmbed(delivery, botToken, threadId, progressMessageId, crashEmbed).catch((err) => {
             log.warn('Failed to update progress embed with crash', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
@@ -157,25 +146,11 @@ export function subscribeForResponseWithEmbed(
           });
         } else {
           const ct2 = getTurnInfo();
-          sendEmbedWithButtons(
-            delivery,
-            botToken,
-            threadId,
-            {
-              description: 'The agent session ended unexpectedly. Send a message to resume.',
-              color: 0xff3355,
-              author,
-              footer: {
-                text: buildFooterText(
-                  { agentName, agentModel, sessionId, projectName, status: 'crashed' },
-                  latestContextUsage,
-                  ct2.active,
-                  ct2.cumulative,
-                ),
-              },
-            },
-            [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
-          ).catch((err) => {
+          const crashBuilder = CorvidEmbed.crash(footerCtx, authorIdentity);
+          if (latestContextUsage) crashBuilder.withContextUsage(latestContextUsage);
+          crashBuilder.withTurns(ct2.active, ct2.cumulative);
+          const { embed: crashEmbed, components } = crashBuilder.build();
+          sendEmbedWithButtons(delivery, botToken, threadId, crashEmbed, components!).catch((err) => {
             log.warn('Failed to send crash embed', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
@@ -196,10 +171,8 @@ export function subscribeForResponseWithEmbed(
     clearTyping();
     log.warn('Typing indicator safety timeout reached', { sessionId, threadId });
     if (!receivedAnyActivity) {
-      sendEmbed(delivery, botToken, threadId, {
-        description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
-        color: 0xf0b232,
-      }).catch((err) => {
+      const { embed } = CorvidEmbed.timeout(footerCtx, authorIdentity).build();
+      sendEmbed(delivery, botToken, threadId, embed).catch((err) => {
         log.warn('Failed to send timeout embed', { threadId, error: err instanceof Error ? err.message : String(err) });
       });
     }
@@ -220,19 +193,17 @@ export function subscribeForResponseWithEmbed(
     const t = getTurnInfo();
     const parts = visibleEmbedParts(text);
     for (const part of parts) {
-      await sendEmbed(delivery, botToken, threadId, {
-        description: part,
-        color,
-        author,
-        footer: {
-          text: buildFooterText(
-            { agentName, agentModel, sessionId, projectName },
-            latestContextUsage,
-            t.active,
-            t.cumulative,
-          ),
-        },
-      });
+      const contentBuilder = new CorvidEmbed()
+        .setDescription(part)
+        .setColor(color)
+        .setAgent(authorIdentity)
+        .setModel(agentModel)
+        .setSession(sessionId)
+        .withTurns(t.active, t.cumulative);
+      if (latestContextUsage) contentBuilder.withContextUsage(latestContextUsage);
+      if (projectName) contentBuilder.setProject(projectName);
+      const { embed: contentEmbed } = contentBuilder.build();
+      await sendEmbed(delivery, botToken, threadId, contentEmbed);
     }
   };
 
@@ -257,25 +228,17 @@ export function subscribeForResponseWithEmbed(
       const filename = `image.${ext}`;
       const attachment: DiscordFileAttachment = { name: filename, data, contentType: ct };
       const imgT = getTurnInfo();
-      await sendEmbedWithFiles(
-        delivery,
-        botToken,
-        threadId,
-        {
-          image: { url: `attachment://${filename}` },
-          color,
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName },
-              latestContextUsage,
-              imgT.active,
-              imgT.cumulative,
-            ),
-          },
-        },
-        [attachment],
-      );
+      const imgBuilder = new CorvidEmbed()
+        .setImage(`attachment://${filename}`)
+        .setColor(color)
+        .setAgent(authorIdentity)
+        .setModel(agentModel)
+        .setSession(sessionId)
+        .withTurns(imgT.active, imgT.cumulative);
+      if (latestContextUsage) imgBuilder.withContextUsage(latestContextUsage);
+      if (projectName) imgBuilder.setProject(projectName);
+      const { embed: imgEmbed } = imgBuilder.build();
+      await sendEmbedWithFiles(delivery, botToken, threadId, imgEmbed, [attachment]);
     } catch (err) {
       log.warn('Failed to send image to Discord thread', {
         imageUrl,
@@ -328,7 +291,7 @@ export function subscribeForResponseWithEmbed(
         if (now - lastStatusTime >= STATUS_DEBOUNCE_MS) {
           lastStatusTime = now;
           // Edit the progress message in place instead of posting a new embed
-          updateProgressMessage(`⏳ ${statusText}`, 'working...').catch((err) => {
+          updateProgressEmbed(CorvidEmbed.toolStatus(statusText, footerCtx, authorIdentity)).catch((err) => {
             log.debug('Tool status embed edit failed', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
@@ -359,19 +322,18 @@ export function subscribeForResponseWithEmbed(
       const warning = event as { level?: string; message?: string; usagePercent?: number };
       if (warning.level === 'critical') {
         const wt = getTurnInfo();
-        sendEmbed(delivery, botToken, threadId, {
-          description: `⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`,
-          color: 0xf0b232, // yellow/warning
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName, status: 'context warning' },
-              latestContextUsage,
-              wt.active,
-              wt.cumulative,
-            ),
-          },
-        }).catch((err) => {
+        const warnBuilder = new CorvidEmbed()
+          .setDescription(`⚠️ ${warning.message || `Context usage at ${warning.usagePercent}%`}`)
+          .setColor(0xf0b232)
+          .setAgent(authorIdentity)
+          .setModel(agentModel)
+          .setSession(sessionId)
+          .setStatus('context warning')
+          .withTurns(wt.active, wt.cumulative);
+        if (latestContextUsage) warnBuilder.withContextUsage(latestContextUsage);
+        if (projectName) warnBuilder.setProject(projectName);
+        const { embed: warnEmbed } = warnBuilder.build();
+        sendEmbed(delivery, botToken, threadId, warnEmbed).catch((err) => {
           log.debug('Context warning embed failed', {
             threadId,
             error: err instanceof Error ? err.message : String(err),
@@ -396,19 +358,11 @@ export function subscribeForResponseWithEmbed(
           const ttlMs = parseInt(process.env.KEEP_ALIVE_TTL_MS ?? String(15 * 60 * 1000), 10);
           const expiresAt = Math.floor((Date.now() + ttlMs) / 1000);
           const dt = getTurnInfo();
-          editEmbed(delivery, botToken, threadId, progressMessageId, {
-            description: `✅ Done · Expires <t:${expiresAt}:R>`,
-            color: 0x57f287,
-            author,
-            footer: {
-              text: buildFooterText(
-                { agentName, agentModel, sessionId, projectName, status: 'warm' },
-                latestContextUsage,
-                dt.active,
-                dt.cumulative,
-              ),
-            },
-          }).catch((err) => {
+          const warmBuilder = CorvidEmbed.warm(footerCtx, authorIdentity, expiresAt);
+          if (latestContextUsage) warmBuilder.withContextUsage(latestContextUsage);
+          warmBuilder.withTurns(dt.active, dt.cumulative);
+          const { embed: warmEmbed } = warmBuilder.build();
+          editEmbed(delivery, botToken, threadId, progressMessageId, warmEmbed).catch((err) => {
             log.debug('Progress warm edit failed', {
               threadId,
               error: err instanceof Error ? err.message : String(err),
@@ -429,19 +383,11 @@ export function subscribeForResponseWithEmbed(
       // Mark the progress message as done (if it exists) before sending the completion embed
       if (progressMessageId) {
         const dt = getTurnInfo();
-        editEmbed(delivery, botToken, threadId, progressMessageId, {
-          description: '✅ Done',
-          color: 0x57f287,
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName, status: 'done' },
-              latestContextUsage,
-              dt.active,
-              dt.cumulative,
-            ),
-          },
-        }).catch((err) => {
+        const doneBuilder = CorvidEmbed.done(footerCtx, authorIdentity);
+        if (latestContextUsage) doneBuilder.withContextUsage(latestContextUsage);
+        doneBuilder.withTurns(dt.active, dt.cumulative);
+        const { embed: doneEmbed } = doneBuilder.build();
+        editEmbed(delivery, botToken, threadId, progressMessageId, doneEmbed).catch((err) => {
           log.debug('Progress done edit failed', { threadId, error: err instanceof Error ? err.message : String(err) });
         });
       }
@@ -553,38 +499,17 @@ export function subscribeForResponseWithEmbed(
           });
         }
 
-        const footerCtx = { agentName, agentModel, sessionId, projectName, status: 'done' };
+        const completionCtx: FooterContext = { agentName, agentModel, sessionId, projectName, status: 'done' };
         const footerStats = { filesChanged: statsFiles, turns: statsTurns, tools: statsTools, commits: statsCommits };
         const statsCumulative = getSessionCumulativeTurns(db, sessionId);
 
-        // Build contextual buttons based on what the session actually did
-        const buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }> = [];
+        const completionBuilder = CorvidEmbed.completion(completionCtx, authorIdentity)
+          .setFields(fields)
+          .withStats(footerStats, statsCumulative);
+        if (latestContextUsage) completionBuilder.withContextUsage(latestContextUsage);
+        const { embed: completionEmbed, components } = completionBuilder.build();
 
-        // "New Session" is the primary action — actually starts a new session in this thread
-        buttons.push({ label: 'New Session', customId: 'new_session', style: ButtonStyle.SUCCESS, emoji: '🔄' });
-
-        // If a PR was created, add a contextual "View PR" button (URL button not supported
-        // via component API, so we include the PR URL in the completion description instead)
-
-        // "Create Issue" — lets the user file a GitHub issue from the conversation
-        buttons.push({ label: 'Create Issue', customId: 'create_issue', style: ButtonStyle.PRIMARY, emoji: '📋' });
-
-        // Archive is secondary
-        buttons.push({ label: 'Archive', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' });
-
-        await sendEmbedWithButtons(
-          delivery,
-          botToken,
-          threadId,
-          {
-            description: 'Session complete. Send a message to continue the conversation.',
-            color: 0x57f287,
-            author,
-            ...(fields.length > 0 ? { fields } : {}),
-            footer: { text: buildFooterWithStats(footerCtx, footerStats, latestContextUsage, statsCumulative) },
-          },
-          [buildActionRow(...buttons)],
-        );
+        await sendEmbedWithButtons(delivery, botToken, threadId, completionEmbed, components!);
       })().catch((err) => {
         log.debug('Session complete embed failed', {
           threadId,
@@ -601,52 +526,24 @@ export function subscribeForResponseWithEmbed(
       const errEvent = event as { error?: { message?: string; errorType?: string; recoverable?: boolean } };
       const errorType = errEvent.error?.errorType || 'unknown';
 
-      // Differentiated messages per error type
-      const { title, description, color: errColor } = sessionErrorEmbed(errorType, errEvent.error?.message);
-
       // If we have a progress message, update it to show the error; otherwise send new
       const et = getTurnInfo();
+      const errBuilder = CorvidEmbed.error(errorType, footerCtx, authorIdentity, errEvent.error?.message);
+      if (latestContextUsage) errBuilder.withContextUsage(latestContextUsage);
+      errBuilder.withTurns(et.active, et.cumulative);
+
       if (progressMessageId) {
-        editEmbed(delivery, botToken, threadId, progressMessageId, {
-          title,
-          description,
-          color: errColor,
-          author,
-          footer: {
-            text: buildFooterText(
-              { agentName, agentModel, sessionId, projectName, status: errorType },
-              latestContextUsage,
-              et.active,
-              et.cumulative,
-            ),
-          },
-        }).catch((err) => {
+        const { embed: errEmbed } = errBuilder.build();
+        editEmbed(delivery, botToken, threadId, progressMessageId, errEmbed).catch((err) => {
           log.debug('Session error embed edit failed', {
             threadId,
             error: err instanceof Error ? err.message : String(err),
           });
         });
       } else {
-        sendEmbedWithButtons(
-          delivery,
-          botToken,
-          threadId,
-          {
-            title,
-            description,
-            color: errColor,
-            author,
-            footer: {
-              text: buildFooterText(
-                { agentName, agentModel, sessionId, projectName, status: errorType },
-                latestContextUsage,
-                et.active,
-                et.cumulative,
-              ),
-            },
-          },
-          [buildActionRow({ label: 'Resume', customId: 'resume_thread', style: ButtonStyle.SUCCESS, emoji: '🔄' })],
-        ).catch((err) => {
+        errBuilder.withButtons(['resume']);
+        const { embed: errEmbed, components } = errBuilder.build();
+        sendEmbedWithButtons(delivery, botToken, threadId, errEmbed, components!).catch((err) => {
           log.debug('Session error embed failed', {
             threadId,
             error: err instanceof Error ? err.message : String(err),
@@ -675,30 +572,14 @@ export function subscribeForResponseWithEmbed(
         if (cumTurns > 0) {
           fields.push({ name: 'Turns', value: String(cumTurns), inline: true });
         }
-        const buttons: Array<{ label: string; customId: string; style?: number; emoji?: string }> = [];
-        buttons.push({ label: 'New Session', customId: 'new_session', style: ButtonStyle.SUCCESS, emoji: '🔄' });
-        buttons.push({ label: 'Create Issue', customId: 'create_issue', style: ButtonStyle.PRIMARY, emoji: '📋' });
-        buttons.push({ label: 'Archive', customId: 'archive_thread', style: ButtonStyle.SECONDARY, emoji: '📦' });
-        sendEmbedWithButtons(
-          delivery,
-          botToken,
-          threadId,
-          {
-            description: 'Session complete. Send a message to continue the conversation.',
-            color: 0x57f287,
-            author,
-            ...(fields.length > 0 ? { fields } : {}),
-            footer: {
-              text: buildFooterText(
-                { agentName, agentModel, sessionId, projectName, status: 'done' },
-                latestContextUsage,
-                dt.active,
-                dt.cumulative,
-              ),
-            },
-          },
-          [buildActionRow(...buttons)],
-        ).catch((err) => {
+
+        const exitCtx: FooterContext = { agentName, agentModel, sessionId, projectName, status: 'done' };
+        const exitBuilder = CorvidEmbed.completion(exitCtx, authorIdentity)
+          .setFields(fields)
+          .withTurns(dt.active, dt.cumulative);
+        if (latestContextUsage) exitBuilder.withContextUsage(latestContextUsage);
+        const { embed: exitEmbed, components } = exitBuilder.build();
+        sendEmbedWithButtons(delivery, botToken, threadId, exitEmbed, components!).catch((err) => {
           log.debug('Keep-alive completion embed failed', {
             threadId,
             error: err instanceof Error ? err.message : String(err),
