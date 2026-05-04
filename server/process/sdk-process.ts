@@ -6,6 +6,7 @@ import {
   type Query,
   query,
   type SDKMessage,
+  type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { Agent, McpServerConfig as DbMcpServerConfig, Project, Session } from '../../shared/types';
 import { createLogger } from '../lib/logger';
@@ -24,6 +25,53 @@ import { BASH_WRITE_OPERATORS, extractFilePathsFromInput, isProtectedPath } from
 import type { ClaudeStreamEvent } from './types';
 
 const log = createLogger('SdkProcess');
+
+/**
+ * Persistent async iterable message queue for keep-alive sessions.
+ * Stays open until explicitly closed, preventing the SDK from calling
+ * endInput() on the CLI process stdin.
+ */
+class MessageQueue implements AsyncIterable<SDKUserMessage>, AsyncIterator<SDKUserMessage> {
+  private queue: SDKUserMessage[] = [];
+  private waiting: ((result: IteratorResult<SDKUserMessage>) => void) | null = null;
+  private closed = false;
+
+  enqueue(msg: SDKUserMessage): void {
+    if (this.closed) return;
+    if (this.waiting) {
+      const resolve = this.waiting;
+      this.waiting = null;
+      resolve({ done: false, value: msg });
+    } else {
+      this.queue.push(msg);
+    }
+  }
+
+  close(): void {
+    this.closed = true;
+    if (this.waiting) {
+      const resolve = this.waiting;
+      this.waiting = null;
+      resolve({ done: true, value: undefined as unknown as SDKUserMessage });
+    }
+  }
+
+  next(): Promise<IteratorResult<SDKUserMessage>> {
+    if (this.queue.length > 0) {
+      return Promise.resolve({ done: false, value: this.queue.shift()! });
+    }
+    if (this.closed) {
+      return Promise.resolve({ done: true, value: undefined as unknown as SDKUserMessage });
+    }
+    return new Promise((resolve) => {
+      this.waiting = resolve;
+    });
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+    return this;
+  }
+}
 
 // Environment variables safe to pass to agent subprocesses.
 // Everything else (ALGOCHAT_MNEMONIC, WALLET_ENCRYPTION_KEY, API_KEY, etc.) is excluded.
@@ -448,9 +496,21 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
     cwd: sdkOptions.cwd,
   });
 
-  // Start the SDK query
+  // Start the SDK query.
+  // For keep-alive sessions, pass an AsyncIterable instead of a string prompt.
+  // This prevents the SDK from setting isSingleUserTurn=true, which would close
+  // stdin after the first result and kill the process.
+  const inputQueue = keepAlive ? new MessageQueue() : null;
+  if (inputQueue) {
+    inputQueue.enqueue({
+      type: 'user',
+      message: { role: 'user', content: effectivePrompt },
+      parent_tool_use_id: null,
+      session_id: session.id,
+    });
+  }
   const q: Query = query({
-    prompt: effectivePrompt,
+    prompt: inputQueue ?? effectivePrompt,
     options: sdkOptions,
   });
 
@@ -565,33 +625,45 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
       contentPreview: isMultimodal ? JSON.stringify(content).slice(0, 300) : (content as string).slice(0, 200),
     });
 
-    // Stream input to the running query
-    q.streamInput(
-      (async function* () {
-        yield {
-          type: 'user' as const,
-          message: { role: 'user' as const, content },
-          parent_tool_use_id: null,
-          session_id: session.id,
-        } as import('@anthropic-ai/claude-agent-sdk').SDKUserMessage;
-      })(),
-    ).catch((err) => {
-      log.warn(`streamInput failed for session ${session.id}`, {
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        wasWarm,
+    // Stream input to the running query.
+    // For keep-alive sessions, enqueue to the persistent input queue (stdin stays open).
+    // For non-keep-alive, use streamInput which closes stdin after the message.
+    if (inputQueue) {
+      inputQueue.enqueue({
+        type: 'user',
+        message: { role: 'user', content },
+        parent_tool_use_id: null,
+        session_id: session.id,
       });
-      // If streamInput fails on a warm process, mark as done so caller falls back to cold start
-      if (wasWarm) {
-        inputDone = true;
-      }
-    });
+    } else {
+      q.streamInput(
+        (async function* () {
+          yield {
+            type: 'user' as const,
+            message: { role: 'user' as const, content },
+            parent_tool_use_id: null,
+            session_id: session.id,
+          } as SDKUserMessage;
+        })(),
+      ).catch((err) => {
+        log.warn(`streamInput failed for session ${session.id}`, {
+          error: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+          wasWarm,
+        });
+        // If streamInput fails on a warm process, mark as done so caller falls back to cold start
+        if (wasWarm) {
+          inputDone = true;
+        }
+      });
+    }
 
     return true;
   }
 
   function kill(): void {
     inputDone = true;
+    inputQueue?.close();
     abortController.abort();
     q.close();
   }
