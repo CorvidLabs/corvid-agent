@@ -150,6 +150,8 @@ export interface TurnCompleteMetrics {
   totalCostUsd: number;
   durationMs: number;
   numTurns: number;
+  inputTokens?: number;
+  contextWindow?: number;
 }
 
 export interface SdkProcessOptions {
@@ -554,10 +556,13 @@ export function startSdkProcess(options: SdkProcessOptions): SdkProcess {
           log.info(`SDK process entering warm state for session ${session.id}`, { pid: pseudoPid });
           if (onTurnComplete) {
             const result = message as import('@anthropic-ai/claude-agent-sdk').SDKResultMessage;
+            const contextUsage = extractContextUsageFromResult(message, agent?.model);
             onTurnComplete({
               totalCostUsd: result.total_cost_usd ?? 0,
               durationMs: result.duration_ms ?? 0,
               numTurns: result.num_turns ?? 0,
+              inputTokens: contextUsage?.estimatedTokens,
+              contextWindow: contextUsage?.contextWindow,
             });
           }
         }
@@ -697,6 +702,14 @@ function extractContextUsageFromResult(
     const primary = modelEntries[0];
     const contextWindow = primary.contextWindow || getContextBudget(model);
     const estimatedTokens = primary.inputTokens;
+    log.info('SDK result modelUsage', {
+      model,
+      inputTokens: primary.inputTokens,
+      outputTokens: primary.outputTokens,
+      cacheReadTokens: primary.cacheReadInputTokens,
+      contextWindow: primary.contextWindow,
+      numTurns: success.num_turns,
+    });
     if (estimatedTokens > 0) {
       const usagePercent = Math.round((estimatedTokens / contextWindow) * 100);
       return { estimatedTokens, contextWindow, usagePercent };
