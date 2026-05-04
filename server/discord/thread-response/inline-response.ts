@@ -5,10 +5,11 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentText } from '../../process/types';
 import {
   agentColor,
-  buildAgentAuthor,
-  buildFooterText,
+  CorvidEmbed,
   type ContextUsage,
   collapseCodeBlocks,
+  type EmbedAgentIdentity,
+  type FooterContext,
   hexColorToInt,
   sendEmbed,
   sendReplyEmbed,
@@ -46,16 +47,16 @@ export function subscribeForInlineResponse(
   let receivedAnyActivity = false; // tracks any activity (content OR tool use)
   let latestContextUsage: ContextUsage | undefined;
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
-  const author = buildAgentAuthor({ agentName, displayIcon, avatarUrl });
+  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName };
+  const authorIdentity: EmbedAgentIdentity = { agentName, displayIcon, avatarUrl };
 
   // Acknowledgment: if no content arrives within ACK_DELAY_MS, send a brief status
   const ackTimer = setTimeout(() => {
     if (!receivedAnyContent) {
-      sendEmbed(delivery, botToken, channelId, {
-        description: 'Received — working on it...',
-        color: 0x95a5a6,
-        author,
-      }).catch((err) => {
+      const ackBuilder = CorvidEmbed.progress(footerCtx, authorIdentity);
+      if (latestContextUsage) ackBuilder.withContextUsage(latestContextUsage);
+      const { embed: ackEmbed } = ackBuilder.build();
+      sendEmbed(delivery, botToken, channelId, ackEmbed).catch((err) => {
         log.debug('Ack embed failed (inline)', { channelId, error: err instanceof Error ? err.message : String(err) });
       });
     }
@@ -68,10 +69,11 @@ export function subscribeForInlineResponse(
       clearTyping();
       log.warn('Process died while typing indicator active (inline)', { sessionId, channelId });
       if (!receivedAnyContent) {
-        sendEmbed(delivery, botToken, channelId, {
-          description: 'The agent session ended unexpectedly. Send a message to start a new session.',
-          color: 0xff3355,
-        }).catch((err) => {
+        const { embed: crashEmbed } = new CorvidEmbed()
+          .setDescription('The agent session ended unexpectedly. Send a message to start a new session.')
+          .setColor(0xff3355)
+          .build();
+        sendEmbed(delivery, botToken, channelId, crashEmbed).catch((err) => {
           log.warn('Failed to send crash embed', {
             channelId,
             error: err instanceof Error ? err.message : String(err),
@@ -93,10 +95,10 @@ export function subscribeForInlineResponse(
     clearInterval(typingInterval);
     log.warn('Typing indicator safety timeout reached (inline)', { sessionId, channelId });
     if (!receivedAnyActivity) {
-      sendEmbed(delivery, botToken, channelId, {
-        description: 'The agent appears to be taking too long. It may still be working \u2014 send a message to check.',
-        color: 0xf0b232,
-      }).catch((err) => {
+      const timeoutBuilder = CorvidEmbed.timeout(footerCtx, authorIdentity);
+      if (latestContextUsage) timeoutBuilder.withContextUsage(latestContextUsage);
+      const { embed: timeoutEmbed } = timeoutBuilder.build();
+      sendEmbed(delivery, botToken, channelId, timeoutEmbed).catch((err) => {
         log.warn('Failed to send timeout embed', {
           channelId,
           error: err instanceof Error ? err.message : String(err),
@@ -119,12 +121,15 @@ export function subscribeForInlineResponse(
     const parts = visibleEmbedParts(text);
     for (let i = 0; i < parts.length; i++) {
       let sentId: string | null = null;
-      const embedPayload = {
-        description: parts[i],
-        color,
-        author,
-        footer: { text: buildFooterText({ agentName, agentModel, sessionId, projectName }, latestContextUsage) },
-      };
+      const contentBuilder = new CorvidEmbed()
+        .setDescription(parts[i])
+        .setColor(color)
+        .setAgent(authorIdentity)
+        .setModel(agentModel)
+        .setSession(sessionId);
+      if (projectName) contentBuilder.setProject(projectName);
+      if (latestContextUsage) contentBuilder.withContextUsage(latestContextUsage);
+      const { embed: embedPayload } = contentBuilder.build();
       if (i === 0) {
         sentId = await sendReplyEmbed(delivery, botToken, channelId, replyToMessageId, embedPayload);
         // Fall back to non-reply if the referenced message no longer exists

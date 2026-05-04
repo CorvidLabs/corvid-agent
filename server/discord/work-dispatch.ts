@@ -8,7 +8,7 @@
 import type { WorkTask } from '../../shared/types/work-tasks';
 import { listAgents } from '../db/agents';
 import { createLogger } from '../lib/logger';
-import { sendDiscordMessage, sendEmbed, sendMessageWithEmbed } from './embeds';
+import { CorvidEmbed, EMBED_COLORS, sendDiscordMessage, sendEmbed, sendMessageWithEmbed } from './embeds';
 import type { MessageHandlerContext } from './message-router';
 
 const log = createLogger('DiscordWorkDispatch');
@@ -76,30 +76,18 @@ export async function handleWorkIntake(
 
     log.info('Work task created from Discord', { taskId: task.id, userId });
 
-    await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
-      title: 'Task Queued',
-      description: `**${task.id}**\n\n${description.slice(0, 200)}${description.length > 200 ? '...' : ''}`,
-      color: 0x5865f2,
-      footer: { text: `Status: ${task.status}` },
-    });
+    const { embed: queuedEmbed } = CorvidEmbed.workTaskQueued(task.id, description).build();
+    await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, queuedEmbed);
 
     ctx.workTaskService.onStatusChange(task.id, (updatedTask) => {
-      const statusMessages: Record<string, { desc: string; color: number }> = {
-        branching: { desc: '⚙️ Setting up workspace and creating branch...', color: 0x5865f2 },
-        running: {
-          desc: `🤖 Agent working${(updatedTask.iterationCount ?? 1) > 1 ? ` (iteration ${updatedTask.iterationCount})` : ''}...`,
-          color: 0x5865f2,
-        },
-        validating: { desc: '🔍 Validating changes...', color: 0xf0b232 },
-      };
-      const statusInfo = statusMessages[updatedTask.status];
-      if (statusInfo) {
-        sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
-          title: 'Task Update',
-          description: `**${updatedTask.id}**\n\n${statusInfo.desc}`,
-          color: statusInfo.color,
-          footer: { text: `Status: ${updatedTask.status}` },
-        }).catch((err) => {
+      const activeStatuses = new Set(['branching', 'running', 'validating']);
+      if (activeStatuses.has(updatedTask.status)) {
+        const { embed: statusEmbed } = CorvidEmbed.workTaskStatus(
+          updatedTask.id,
+          updatedTask.status,
+          updatedTask.iterationCount,
+        ).build();
+        sendEmbed(ctx.delivery, ctx.config.botToken, channelId, statusEmbed).catch((err) => {
           log.debug('Failed to send work task status embed', {
             taskId: updatedTask.id,
             status: updatedTask.status,
@@ -121,11 +109,12 @@ export async function handleWorkIntake(
     const message = err instanceof Error ? err.message : String(err);
     log.error('Failed to create work task from Discord', { error: message, userId });
 
-    await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
-      title: 'Task Failed',
-      description: message.slice(0, 500),
-      color: 0xed4245,
-    });
+    const { embed: failEmbed } = new CorvidEmbed()
+      .setTitle('Task Failed')
+      .setDescription(message.slice(0, 500))
+      .setColor(EMBED_COLORS.error)
+      .build();
+    await sendEmbed(ctx.delivery, ctx.config.botToken, channelId, failEmbed);
   }
 }
 
@@ -151,39 +140,34 @@ export async function sendTaskResult(
     }
     fields.push({ name: 'Iterations', value: String(task.iterationCount), inline: true });
 
+    const { embed: completedEmbed } = CorvidEmbed.workTaskCompleted(task.id, task.description)
+      .setFields(fields)
+      .build();
     await sendMessageWithEmbed(
       ctx.delivery,
       ctx.config.botToken,
       channelId,
       mention ? `${mention}Your work task is done!` : undefined,
-      {
-        title: 'Task Completed',
-        description: task.description.slice(0, 300),
-        color: 0x57f287,
-        fields,
-        footer: { text: `Task: ${task.id}` },
-      },
+      completedEmbed,
     );
   } else if (task.status === 'failed') {
+    const errorFields: Array<{ name: string; value: string; inline?: boolean }> = [
+      ...((task.error ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }] : []) as Array<{
+        name: string;
+        value: string;
+        inline?: boolean;
+      }>),
+      { name: 'Iterations', value: String(task.iterationCount), inline: true },
+    ];
+    const { embed: failedEmbed } = CorvidEmbed.workTaskFailed(task.id, task.description)
+      .setFields(errorFields)
+      .build();
     await sendMessageWithEmbed(
       ctx.delivery,
       ctx.config.botToken,
       channelId,
       mention ? `${mention}Your work task encountered an issue.` : undefined,
-      {
-        title: 'Task Failed',
-        description: task.description.slice(0, 300),
-        color: 0xed4245,
-        fields: [
-          ...((task.error ? [{ name: 'Error', value: task.error.slice(0, 1024), inline: false }] : []) as Array<{
-            name: string;
-            value: string;
-            inline?: boolean;
-          }>),
-          { name: 'Iterations', value: String(task.iterationCount), inline: true },
-        ],
-        footer: { text: `Task: ${task.id}` },
-      },
+      failedEmbed,
     );
   }
 }
