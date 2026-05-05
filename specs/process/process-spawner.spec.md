@@ -99,8 +99,6 @@ This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `warmStartProcess` | `(deps, sessionId, prompt, userPrompt?)` | `boolean` | Resume a live process with new message. Verifies process is alive, calls `sendMessage` to inject the next message. Returns `true` on success; on failure, returns `false` to signal warm-path fallback to cold-start. Never reconstructs the process or session config. |
-| `coldStartProcess` | `(deps, session, project, agent, prompt, options?)` | `void` | Spawn a new process from scratch. Resolves session config, builds MCP context, calls spawner functions (`spawnSdkProcess` or `spawnDirectProcess`), registers process, writes PID/status to DB. May throw on fatal errors. |
 | `registerSpawnedProcess` | `(deps, session, sp)` | `void` | Final step after spawn: clears starting guard, registers process, inits metadata, writes PID/status to DB, starts timers, emits `session_started` |
 | `spawnSdkProcess` | `(deps, session, project, agent, prompt, options?)` | `void` | Start an SDK (Claude Code) process: resolves session config, builds MCP context, delegates to `startSdkProcess`, registers on success |
 | `spawnDirectProcess` | `(deps, session, project, agent, prompt, provider, options?)` | `void` | Start a direct (Ollama) process: resolves session config, builds MCP context, delegates to `startDirectProcess`, registers on success |
