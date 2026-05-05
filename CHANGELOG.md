@@ -4,6 +4,64 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.66.0] - 2026-05-05
+
+### Chores
+
+- adopt fledge as primary tooling (#2220) (a77f194b)
+
+### Features
+
+- standardized PR body template (#2272) (#2275) (44fafb93)
+- make context reconstruction cold-start-only (#2270) (963e854c)
+- add keep-alive warm-turn support to AlgoChat bridge (#2259) (ae7f88d2)
+- add keep-alive warm-turn support to Telegram bridge (#2251) (8958068f)
+- add human collaborator attribution to PRs, issues, and commits (#2269) (c4008742)
+- improve @mention reliability — new session per mention, 5m TTL, lighter context (#2266) (0e7e4ebc)
+- enable keep-alive by default and clean up embed footers (#2257) (06aaa6dc)
+- active duration tracking and keep-alive TTL countdown (#2247) (d34e21c5)
+- Phase 3 — per-session flag, coexistence, dashboard warm badges (#2243) (4d473e58)
+- implement keep-alive state machine and warm path (Phase 2) (86ac6830)
+- increase default session timeout to 2h and add token breakdown logging (#2228) (7e66bd42)
+- add multi-agent coordination test suite (Action 1, readiness plan) (#2219) (524c8ec4)
+- expose observation tools to agents via SDK (#2211) (519064eb)
+- dual turn counter in embed footer (#2216) (#2218) (ef41a4b8)
+
+### Fixes
+
+- show project name in embed footer (#2277) (9d84600c)
+- prevent numeric Discord IDs from becoming GitHub usernames in resolveRequestedBy (#2276) (1c24175c)
+- use dynamic Discord timestamp for mention session expiry (#2268) (191abbaa)
+- show "mention · 5m" label in mention embed footers (#2267) (5fe1f10c)
+- log PSK trial-decrypt failures at debug level (#2256) (c638637d)
+- filter premature SDK context_usage readings in embed footer (#2255) (632addb0)
+- prevent race condition in thread message handling (#2253) (d82ca419)
+- update context tokens after warm turn completion (#2246) (7590f624)
+- persistent message queue prevents stdin close (#2245) (de76adbd)
+- wire keepAlive params into initial start path (#2244) (e560ff3f)
+- resolve duplicate migration version 123 collision (#2221) (14601912)
+- paginate ARC-69 ASA listing and add diagnostic logging (#2217) (ab520b7e)
+- fix 14 test failures left by escalation feature (#2209) (#2215) (7f467d92)
+- prevent NULL token counts by finalizing tracking before cleanup (#2214) (ee3d194c)
+- emit context_usage event on resume so footer shows fresh token count (#2212) (b9960663)
+
+### Other
+
+- deps: bump zod from 4.3.6 to 4.4.3 (#2249) (597c0549)
+- deps: bump @anthropic-ai/sdk from 0.92.0 to 0.93.0 in the server-minor-patch group (#2248) (78c27c5f)
+- specs: add warm-start path and waiting state protection documentation (#2232, #2233) (#2258) (21600fa6)
+- spec(process): add keep-alive lifecycle to process specs (Phase 1) (c2f3d694)
+- deps: bump discord.js and marked patch versions (#2239) (f614a055)
+- blog: add v0.65 release post (#2227) (8542b358)
+
+### Refactoring
+
+- unified CorvidEmbed builder + TTL fix (#2252) (25b0f026)
+
+### Tests
+
+- add coverage for cumulative turns and context token tracking (#2254) (6fd848ce)
+
 ## [0.64.0] - 2026-04-19
 
 **49 PRs merged** — Major Angular Material UI migration, performance & stability hardening, security updates.
