@@ -658,7 +658,7 @@ export class MessageRouter {
 
         conversation = createConversation(this.db, participant, agentId, session.id);
 
-        this.subscriptionManager.subscribeForResponse(session.id, participant);
+        this.subscriptionManager.subscribeForResponse(session.id, participant, session.keepAlive);
 
         // Handle session start failure
         try {
@@ -682,14 +682,18 @@ export class MessageRouter {
       } else {
         if (conversation.sessionId) {
           // Always subscribe so the reply gets sent back on-chain
-          this.subscriptionManager.subscribeForResponse(conversation.sessionId, participant);
+          const { getSession } = await import('../db/sessions');
+          const existingSession = getSession(this.db, conversation.sessionId);
+          this.subscriptionManager.subscribeForResponse(
+            conversation.sessionId,
+            participant,
+            existingSession?.keepAlive ?? false,
+          );
 
           const sent = this.processManager.sendMessage(conversation.sessionId, agentContent);
           if (!sent) {
-            const { getSession } = await import('../db/sessions');
-            const session = getSession(this.db, conversation.sessionId);
-            if (session) {
-              this.processManager.resumeProcess(session, agentContent);
+            if (existingSession) {
+              this.processManager.resumeProcess(existingSession, agentContent);
             }
           }
         } else {
@@ -714,7 +718,7 @@ export class MessageRouter {
               updateConversationSession(this.db, conversation.id, session.id);
               conversation.sessionId = session.id;
 
-              this.subscriptionManager.subscribeForResponse(session.id, participant);
+              this.subscriptionManager.subscribeForResponse(session.id, participant, session.keepAlive);
               try {
                 this.processManager.startProcess(session, agentContent);
                 // Record inbound AlgoChat message as a short-term observation
