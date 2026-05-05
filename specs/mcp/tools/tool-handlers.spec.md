@@ -79,6 +79,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `formatHumanCoAuthoredBy` | `(collaborator: HumanCollaborator)` | `string` | Format a Co-Authored-By git trailer for a human collaborator, using their GitHub noreply email if available |
 | `buildAgentSignature` | `(ctx: McpToolContext, collaborators?)` | `string` | Look up agent from DB and build identity footer with optional human collaborator attribution; returns empty string on failure |
 | `resolveCollaborator` | `(db: Database, platform: ContactPlatform, platformId: string)` | `HumanCollaborator \| null` | Look up a human collaborator from the contacts DB by platform ID, resolving their GitHub username if linked |
+| `resolveRequestedBy` | `(ctx: McpToolContext, requestedBy?: string)` | `HumanCollaborator[] \| undefined` | Resolve a comma-separated `requested_by` string into collaborators; tries GitHub then Discord contact lookup, falls back to treating the name as a GitHub username (numeric-only values get no `githubUsername`) |
 | `HumanCollaborator` | interface | `{ displayName, githubUsername? }` | Represents a human collaborator for attribution in PRs, issues, and commits |
 
 ### Exported Functions
