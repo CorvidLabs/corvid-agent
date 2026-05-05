@@ -326,6 +326,7 @@ Side effects on construction:
 17. **Keep-alive TTL management**: Warm processes have a configurable inactivity TTL (`KEEP_ALIVE_TTL_MS`, default 15 minutes) managed by `SessionTimerManager`. The TTL resets on each successful `sendMessage()`. On expiry, the process is killed via `kill()` and removed from the `processes` map. The next message triggers a cold start
 18. **Warm-to-cold fallback transparency**: When the warm path fails (streamInput error), `resumeProcess` falls through to the cold path silently — the caller and the end user see no difference. A `warm_path_failed` event is emitted for observability but does not surface to the user
 19. **Keep-alive and context reset coexistence**: The existing context reset (after `MAX_TURNS_BEFORE_CONTEXT_RESET` turns) still applies to keep-alive sessions. When triggered, the warm process is killed, a conversation summary is saved, and the next message starts a cold path with compressed context
+20. **Cold-start-only context reconstruction**: `buildResumePrompt` is exclusively called on the cold-start path. Warm turns never invoke context reconstruction — the SDK process already has full conversation history in its in-memory context window. If a warm process is present and `sendMessage` succeeds, `buildResumePrompt` is not called. The standalone `buildResumePrompt` function in `resume-prompt-builder.ts` accepts an optional `isWarmTurn` parameter which short-circuits reconstruction if `true`, providing a safe guard at the function boundary.
 
 ## Behavioral Examples
 
@@ -497,3 +498,4 @@ Internal constants (not env-configurable):
 | 2026-04-20 | corvid-agent | Add approval-flow.ts (approval request/response bridge) and persona-injector.ts (persona+skill injection facade); add session-lifecycle.ts to files list; document new exported functions |
 | 2026-04-22 | corvid-agent | Add `isAlive()` to `SdkProcess` interface; sendMessage evicts zombie processes from Map; orphan pruner detects dead-in-Map processes via `isAlive()` (#2127) |
 | 2026-05-04 | corvid-agent | v2: Keep-alive architecture — warm path vs cold path routing in resumeProcess, KEEP_ALIVE_TTL_MS, warm_path_failed event, context reset coexistence (#2222, #2223) |
+| 2026-05-05 | corvid-agent | Add invariant 20: cold-start-only context reconstruction; document isWarmTurn guard in resume-prompt-builder.ts (#2225) |
