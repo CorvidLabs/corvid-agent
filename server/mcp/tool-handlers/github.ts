@@ -103,7 +103,7 @@ function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: str
  * Resolve a `requested_by` string into collaborator info.
  * Accepts a GitHub username (with or without @), a Discord ID, or a display name.
  */
-function resolveRequestedBy(ctx: McpToolContext, requestedBy?: string): HumanCollaborator[] | undefined {
+export function resolveRequestedBy(ctx: McpToolContext, requestedBy?: string): HumanCollaborator[] | undefined {
   if (!requestedBy) return undefined;
   const names = requestedBy
     .split(',')
@@ -122,7 +122,9 @@ function resolveRequestedBy(ctx: McpToolContext, requestedBy?: string): HumanCol
       collaborators.push(byDiscord);
       continue;
     }
-    collaborators.push({ displayName: cleaned, githubUsername: cleaned });
+    // Numeric-only strings are platform IDs (e.g. Discord snowflakes) — not valid GitHub usernames.
+    const githubUsername = /^\d+$/.test(cleaned) ? undefined : cleaned;
+    collaborators.push({ displayName: cleaned, githubUsername });
   }
   return collaborators.length > 0 ? collaborators : undefined;
 }
