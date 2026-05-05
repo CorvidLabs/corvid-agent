@@ -54,7 +54,7 @@ export function subscribeForAdaptiveInlineResponse(
   const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
   let receivedAnyActivity = false;
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
-  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName, sessionType: 'mention · 5m' };
+  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName, sessionType: 'mention' };
   const authorIdentity: EmbedAgentIdentity = { agentName, displayIcon, avatarUrl };
 
   // Progress embed state — only created when tool use is detected
@@ -280,8 +280,9 @@ export function subscribeForAdaptiveInlineResponse(
 
           // Offer "Continue in Thread" button so the user can move the conversation
           // out of the channel and into a dedicated thread (reduces channel spam).
+          const expiresAtUnix = Math.floor(Date.now() / 1000) + 5 * 60;
           const continueBuilder = new CorvidEmbed()
-            .setDescription('Reply to continue here, or start a thread for a longer conversation.')
+            .setDescription(`Reply to continue here, or start a thread for a longer conversation. Expires <t:${expiresAtUnix}:R>.`)
             .setColor(0x95a5a6)
             .setAgent(authorIdentity)
             .setModel(agentModel)
