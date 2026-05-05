@@ -133,6 +133,7 @@ export class CorvidEmbed {
   private _sessionId?: string;
   private _projectName?: string;
   private _status?: string;
+  private _sessionType?: string;
 
   // Footer
   private _footerOverride?: string;
@@ -186,6 +187,11 @@ export class CorvidEmbed {
 
   setStatus(status: string): this {
     this._status = status;
+    return this;
+  }
+
+  setSessionType(sessionType: string): this {
+    this._sessionType = sessionType;
     return this;
   }
 
@@ -289,6 +295,7 @@ export class CorvidEmbed {
         ...(this._sessionId ? { sessionId: this._sessionId } : {}),
         ...(this._projectName ? { projectName: this._projectName } : {}),
         ...(this._status ? { status: this._status } : {}),
+        ...(this._sessionType ? { sessionType: this._sessionType } : {}),
       };
 
       const footerText = this._stats

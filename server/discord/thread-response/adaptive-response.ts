@@ -127,6 +127,7 @@ export function subscribeForAdaptiveInlineResponse(
         .setAgent(authorIdentity)
         .setModel(agentModel)
         .setSession(sessionId);
+      if (footerCtx.sessionType) contentBuilder.setSessionType(footerCtx.sessionType);
       if (projectName) contentBuilder.setProject(projectName);
       if (latestContextUsage) contentBuilder.withContextUsage(latestContextUsage);
       const { embed: embedPayload } = contentBuilder.build();
@@ -191,6 +192,7 @@ export function subscribeForAdaptiveInlineResponse(
         .setAgent(authorIdentity)
         .setModel(agentModel)
         .setSession(sessionId);
+      if (footerCtx.sessionType) imgBuilder.setSessionType(footerCtx.sessionType);
       if (projectName) imgBuilder.setProject(projectName);
       if (latestContextUsage) imgBuilder.withContextUsage(latestContextUsage);
       const { embed: imgEmbed } = imgBuilder.build();
@@ -286,6 +288,7 @@ export function subscribeForAdaptiveInlineResponse(
             .setSession(sessionId)
             .withButtons(['continue_thread'])
             .withButtonOverride('continue_thread', `continue_thread:${sessionId}`);
+          if (footerCtx.sessionType) continueBuilder.setSessionType(footerCtx.sessionType);
           if (projectName) continueBuilder.setProject(projectName);
           if (latestContextUsage) continueBuilder.withContextUsage(latestContextUsage);
           const { embed: continueEmbed, components } = continueBuilder.build();
