@@ -15,6 +15,7 @@
  */
 
 import { createLogger } from '../lib/logger';
+import type { EventCallback } from '../process/interfaces';
 import type { ProcessManager } from '../process/manager';
 import type { ClaudeStreamEvent } from '../process/types';
 import { extractContentText } from '../process/types';
@@ -65,8 +66,8 @@ export class SubscriptionManager {
   private processManager: ProcessManager;
   private responseFormatter: ResponseFormatter;
 
-  /** Active on-chain subscriptions (sessionId set). */
-  private chainSubscriptions: Set<string> = new Set();
+  /** Active on-chain subscription callbacks keyed by sessionId. */
+  private chainCallbacks: Map<string, EventCallback> = new Map();
   /** Local subscription callbacks keyed by sessionId. */
   private localSubscriptions: Map<string, (sid: string, event: ClaudeStreamEvent) => void> = new Map();
   /** Local send functions keyed by sessionId (updatable for WS reconnects). */
@@ -94,7 +95,7 @@ export class SubscriptionManager {
    * Check whether an on-chain subscription exists for a session.
    */
   hasChainSubscription(sessionId: string): boolean {
-    return this.chainSubscriptions.has(sessionId);
+    return this.chainCallbacks.has(sessionId);
   }
 
   /**
@@ -133,10 +134,15 @@ export class SubscriptionManager {
    * @param sessionId - The session to subscribe to
    * @param participant - The on-chain participant address to send responses to
    */
-  subscribeForResponse(sessionId: string, participant: string): void {
-    // Avoid duplicate subscriptions when multiple messages arrive for the same session
-    if (this.chainSubscriptions.has(sessionId)) return;
-    this.chainSubscriptions.add(sessionId);
+  subscribeForResponse(sessionId: string, participant: string, keepAlive = false): void {
+    // Dedup: for keep-alive sessions, replace the existing callback so the new
+    // turn's response is routed to the correct participant context.
+    const existing = this.chainCallbacks.get(sessionId);
+    if (existing) {
+      if (!keepAlive) return; // non-keep-alive: skip duplicate
+      this.processManager.unsubscribe(sessionId, existing);
+      this.chainCallbacks.delete(sessionId);
+    }
 
     // We only send the LAST text block from the last turn. Earlier text
     // blocks are intermediate explanations (tool call reasoning, etc.)
@@ -164,7 +170,7 @@ export class SubscriptionManager {
 
       stopProgressTimer();
       this.processManager.unsubscribe(sessionId, callback);
-      this.chainSubscriptions.delete(sessionId);
+      this.chainCallbacks.delete(sessionId);
       this.clearSubscriptionTimer(sessionId);
 
       // Prefer streamed text block > last turn response > full assistant text
@@ -517,8 +523,29 @@ export class SubscriptionManager {
         } else if (lastAssistantText.trim()) {
           lastTurnResponse = lastAssistantText;
         }
-        lastTextBlock = '';
-        lastAssistantText = '';
+
+        if (keepAlive) {
+          // Warm turn: send this turn's response immediately and reset for the next turn.
+          // The process stays alive; session_exited fires only when the keep-alive TTL expires.
+          const turnText = lastTurnResponse.trim();
+          if (turnText) {
+            this.responseFormatter.sendResponse(participant, turnText).catch((err: unknown) => {
+              log.warn('Failed to send warm-turn AlgoChat response', {
+                participant,
+                sessionId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            });
+          }
+          lastTextBlock = '';
+          lastAssistantText = '';
+          lastTurnResponse = '';
+          agentQueryCount = 0;
+          statusEmitted = false;
+        } else {
+          lastTextBlock = '';
+          lastAssistantText = '';
+        }
         resetTimer(); // Turn completed — reset timeout
       }
 
@@ -531,6 +558,7 @@ export class SubscriptionManager {
       }
     };
 
+    this.chainCallbacks.set(sessionId, callback);
     this.processManager.subscribe(sessionId, callback);
     resetTimer();
   }
@@ -702,7 +730,10 @@ export class SubscriptionManager {
     }
     this.subscriptionTimers.clear();
     this.subscriptionTimeoutCallbacks.clear();
-    this.chainSubscriptions.clear();
+    for (const [sid, cb] of this.chainCallbacks.entries()) {
+      this.processManager.unsubscribe(sid, cb);
+    }
+    this.chainCallbacks.clear();
     this.localSubscriptions.clear();
     this.localSendFns.clear();
     this.localEventFns.clear();

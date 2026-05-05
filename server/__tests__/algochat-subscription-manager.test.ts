@@ -1271,3 +1271,95 @@ describe('mixed subscriptions', () => {
     expect(sm.hasLocalSubscription(SESSION_ID_2)).toBe(false);
   });
 });
+
+// ── keep-alive warm-turn support ─────────────────────────────────────────
+
+describe('subscribeForResponse (keepAlive=true)', () => {
+  test('sends response immediately on result (warm turn), stays subscribed', async () => {
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+
+    pm._emit(SESSION_ID, contentBlockStart('text'));
+    pm._emit(SESSION_ID, contentBlockDelta('Turn 1 response'));
+    pm._emit(SESSION_ID, contentBlockStop());
+    pm._emit(SESSION_ID, resultEvent());
+
+    await Bun.sleep(10);
+
+    // Response sent immediately at turn end, not waiting for session_exited
+    const warmResponse = rf._responses.find((r) => r.content === 'Turn 1 response');
+    expect(warmResponse).toBeDefined();
+    expect(warmResponse!.participant).toBe(PARTICIPANT);
+
+    // Still subscribed — session is warm
+    expect(sm.hasChainSubscription(SESSION_ID)).toBe(true);
+  });
+
+  test('delivers each turn independently in multi-turn warm session', async () => {
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+
+    // Turn 1
+    pm._emit(SESSION_ID, contentBlockStart('text'));
+    pm._emit(SESSION_ID, contentBlockDelta('First response'));
+    pm._emit(SESSION_ID, contentBlockStop());
+    pm._emit(SESSION_ID, resultEvent());
+    await Bun.sleep(10);
+
+    // Turn 2 — new subscription replaces callback
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+    pm._emit(SESSION_ID, contentBlockStart('text'));
+    pm._emit(SESSION_ID, contentBlockDelta('Second response'));
+    pm._emit(SESSION_ID, contentBlockStop());
+    pm._emit(SESSION_ID, resultEvent());
+    await Bun.sleep(10);
+
+    const nonStatus = rf._responses.filter((r) => !r.content.startsWith('[Status]'));
+    expect(nonStatus.length).toBe(2);
+    expect(nonStatus[0].content).toBe('First response');
+    expect(nonStatus[1].content).toBe('Second response');
+  });
+
+  test('replaces existing callback on re-subscribe for warm turn', () => {
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+    const subscribeCallsBefore = (pm.subscribe as ReturnType<typeof mock>).mock.calls.length;
+
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+    const subscribeCallsAfter = (pm.subscribe as ReturnType<typeof mock>).mock.calls.length;
+
+    // Old callback was unsubscribed and new one registered
+    expect((pm.unsubscribe as ReturnType<typeof mock>).mock.calls.length).toBe(1);
+    expect(subscribeCallsAfter).toBe(subscribeCallsBefore + 1);
+  });
+
+  test('session_exited cleans up without double-sending', async () => {
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, true);
+
+    pm._emit(SESSION_ID, contentBlockStart('text'));
+    pm._emit(SESSION_ID, contentBlockDelta('Last response'));
+    pm._emit(SESSION_ID, contentBlockStop());
+    pm._emit(SESSION_ID, resultEvent());
+    await Bun.sleep(10);
+
+    // Turn response already sent — session_exited should not send it again
+    const responsesBeforeExit = rf._responses.filter((r) => !r.content.startsWith('[Status]')).length;
+
+    pm._emit(SESSION_ID, sessionExitedEvent());
+    await Bun.sleep(10);
+
+    const responsesAfterExit = rf._responses.filter((r) => !r.content.startsWith('[Status]')).length;
+    expect(responsesAfterExit).toBe(responsesBeforeExit); // No additional send
+
+    // Unsubscribed after exit
+    expect(sm.hasChainSubscription(SESSION_ID)).toBe(false);
+  });
+
+  test('non-keep-alive dedup still returns early (no callback replacement)', () => {
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, false);
+    const subscribeCallsBefore = (pm.subscribe as ReturnType<typeof mock>).mock.calls.length;
+
+    sm.subscribeForResponse(SESSION_ID, PARTICIPANT, false);
+
+    // No replacement — returned early
+    expect((pm.unsubscribe as ReturnType<typeof mock>).mock.calls.length).toBe(0);
+    expect((pm.subscribe as ReturnType<typeof mock>).mock.calls.length).toBe(subscribeCallsBefore);
+  });
+});
