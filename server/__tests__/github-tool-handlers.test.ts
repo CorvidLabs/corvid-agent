@@ -85,7 +85,9 @@ const {
   handleGitHubFollowUser,
 } = await import('../mcp/tool-handlers');
 
-const { friendlyModelName, formatAgentSignature, formatCoAuthoredBy } = await import('../mcp/tool-handlers/github');
+const { friendlyModelName, formatAgentSignature, formatCoAuthoredBy, formatHumanCoAuthoredBy } = await import(
+  '../mcp/tool-handlers/github'
+);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -958,5 +960,53 @@ describe('formatCoAuthoredBy (#1576)', () => {
 
   test('returns empty string for undefined agent', () => {
     expect(formatCoAuthoredBy(undefined)).toBe('');
+  });
+});
+
+// ── formatHumanCoAuthoredBy ─────────────────────────────────────────────
+
+describe('formatHumanCoAuthoredBy', () => {
+  test('formats with GitHub noreply email when username is present', () => {
+    expect(formatHumanCoAuthoredBy({ displayName: 'Leif', githubUsername: 'kyntrin' })).toBe(
+      'Co-Authored-By: Leif <kyntrin@users.noreply.github.com>',
+    );
+  });
+
+  test('formats with display name only when no GitHub username', () => {
+    expect(formatHumanCoAuthoredBy({ displayName: 'Leif' })).toBe('Co-Authored-By: Leif');
+  });
+});
+
+// ── formatAgentSignature with collaborators ──────────────────────────────
+
+describe('formatAgentSignature with collaborators', () => {
+  test('appends collaborator with GitHub username as @mention', () => {
+    const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' }, undefined, [
+      { displayName: 'Leif', githubUsername: 'kyntrin' },
+    ]);
+    expect(sig).toContain('Requested by: @kyntrin');
+  });
+
+  test('appends collaborator display name when no GitHub username', () => {
+    const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' }, undefined, [{ displayName: 'Leif' }]);
+    expect(sig).toContain('Requested by: Leif');
+  });
+
+  test('appends multiple collaborators comma-separated', () => {
+    const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' }, undefined, [
+      { displayName: 'Leif', githubUsername: 'kyntrin' },
+      { displayName: 'Tofu' },
+    ]);
+    expect(sig).toContain('Requested by: @kyntrin, Tofu');
+  });
+
+  test('omits collaborator line when collaborators array is empty', () => {
+    const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' }, undefined, []);
+    expect(sig).not.toContain('Requested by');
+  });
+
+  test('omits collaborator line when collaborators is undefined', () => {
+    const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' });
+    expect(sig).not.toContain('Requested by');
   });
 });
