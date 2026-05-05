@@ -288,12 +288,46 @@ export function persistConversationSummary(db: Database, sessionId: string): voi
 }
 
 /**
+ * Check if a worktree has uncommitted changes or unpushed commits.
+ */
+async function isWorktreeDirty(workDir: string): Promise<boolean> {
+  try {
+    const statusProc = Bun.spawn(['git', 'status', '--porcelain'], {
+      cwd: workDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const statusOutput = await new Response(statusProc.stdout).text();
+    await statusProc.exited;
+    if (statusOutput.trim().length > 0) return true;
+
+    const logProc = Bun.spawn(['git', 'log', '--oneline', '@{upstream}..HEAD'], {
+      cwd: workDir,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const logOutput = await new Response(logProc.stdout).text();
+    await logProc.exited;
+    return logOutput.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Clean up worktrees created for chat sessions (not work tasks).
  * Chat worktree directories contain `/chat-` in the path.
  * Also cleans up ephemeral project directories.
  * Fire-and-forget — errors are logged but do not block session cleanup.
+ *
+ * For mention sessions, checks for uncommitted work before cleanup:
+ * - Clean worktrees are removed immediately
+ * - Dirty worktrees are preserved (caller notified via return value)
  */
-export function cleanupChatWorktree(deps: Pick<ExitHandlerDeps, 'db' | 'ephemeralDirs'>, sessionId: string): void {
+export async function cleanupChatWorktree(
+  deps: Pick<ExitHandlerDeps, 'db' | 'ephemeralDirs'>,
+  sessionId: string,
+): Promise<'cleaned' | 'dirty' | 'skipped'> {
   // Clean up ephemeral project directories
   const ephemeral = deps.ephemeralDirs.get(sessionId);
   if (ephemeral) {
@@ -309,10 +343,22 @@ export function cleanupChatWorktree(deps: Pick<ExitHandlerDeps, 'db' | 'ephemera
 
   // Clean up chat worktrees
   const session = getSession(deps.db, sessionId);
-  if (!session?.workDir?.includes('/chat-')) return;
+  if (!session?.workDir?.includes('/chat-')) return 'skipped';
 
   const project = session.projectId ? getProject(deps.db, session.projectId) : null;
-  if (!project?.workingDir) return;
+  if (!project?.workingDir) return 'skipped';
+
+  const isMentionSession = session.name?.startsWith('Discord mention:');
+  if (isMentionSession) {
+    const dirty = await isWorktreeDirty(session.workDir);
+    if (dirty) {
+      log.info('Mention session worktree has uncommitted changes — preserving', {
+        sessionId,
+        workDir: session.workDir,
+      });
+      return 'dirty';
+    }
+  }
 
   removeWorktree(project.workingDir, session.workDir, { cleanBranch: true }).catch((err) => {
     log.warn('Failed to clean up chat worktree', {
@@ -321,4 +367,5 @@ export function cleanupChatWorktree(deps: Pick<ExitHandlerDeps, 'db' | 'ephemera
       error: err instanceof Error ? err.message : String(err),
     });
   });
+  return 'cleaned';
 }

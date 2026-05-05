@@ -172,6 +172,8 @@ interface SessionMeta {
   lastContextUsagePercent?: number;
   /** Cached channel/thread ID for observation scoping (resolved lazily on first message). */
   channelId?: string | null;
+  /** Per-session keep-alive TTL override in ms (e.g. shorter TTL for mention sessions). */
+  keepAliveTtlMs?: number;
 }
 
 export class ProcessManager {
@@ -182,6 +184,8 @@ export class ProcessManager {
   private processes: Map<string, SdkProcess> = new Map();
   private readonly eventBus = new SessionEventBus();
   private sessionMeta: Map<string, SessionMeta> = new Map();
+  /** Per-session keep-alive TTL overrides (e.g. shorter TTL for mention sessions). */
+  private keepAliveTtlOverrides: Map<string, number> = new Map();
   private ephemeralDirs: Map<string, ResolvedDir> = new Map();
   /** Guard against concurrent resume/start for the same session. */
   private startingSession: Set<string> = new Set();
@@ -279,6 +283,11 @@ export class ProcessManager {
     this.pluginRegistry = registry;
   }
 
+  /** Set a per-session keep-alive TTL override (e.g. 5m for mention sessions vs 2h default). */
+  setKeepAliveTtl(sessionId: string, ttlMs: number): void {
+    this.keepAliveTtlOverrides.set(sessionId, ttlMs);
+  }
+
   /** Build an McpToolContext for a given agent, or null if MCP services aren't available. */
   private buildMcpContext(
     agentId: string,
@@ -334,6 +343,10 @@ export class ProcessManager {
       conversationOnly?: boolean;
       toolAllowList?: string[];
       mcpToolAllowList?: string[];
+      /** Per-session keep-alive TTL override in ms (e.g. 5m for mention sessions). */
+      keepAliveTtlMs?: number;
+      /** Skip skill bundle prompt loading for lightweight sessions (e.g. mention sessions). */
+      skipSkillPrompt?: boolean;
     },
   ): void {
     if (this.startingSession.has(session.id)) {
@@ -509,6 +522,7 @@ export class ProcessManager {
         options?.conversationOnly,
         options?.toolAllowList,
         options?.mcpToolAllowList,
+        options?.skipSkillPrompt,
       );
     } else {
       this.startSdkProcessWrapped(
@@ -522,6 +536,7 @@ export class ProcessManager {
         options?.conversationOnly,
         options?.toolAllowList,
         options?.mcpToolAllowList,
+        options?.skipSkillPrompt,
       );
     }
   }
@@ -543,6 +558,7 @@ export class ProcessManager {
       conversationOnly?: boolean;
       toolAllowList?: string[];
       mcpToolAllowList?: string[];
+      skipSkillPrompt?: boolean;
     },
   ): Promise<void> {
     const resolved = await resolveProjectDir(project);
@@ -591,6 +607,7 @@ export class ProcessManager {
         options?.conversationOnly,
         options?.toolAllowList,
         options?.mcpToolAllowList,
+        options?.skipSkillPrompt,
       );
     }
   }
@@ -606,10 +623,14 @@ export class ProcessManager {
     conversationOnly?: boolean,
     toolAllowList?: string[],
     mcpToolAllowList?: string[],
+    skipSkillPrompt?: boolean,
   ): void {
     const effectiveProject = session.workDir ? { ...project, workingDir: session.workDir } : project;
 
     const config = resolveSessionConfig(this.db, agent, session.agentId, session.projectId);
+    if (skipSkillPrompt) {
+      config.skillPrompt = undefined;
+    }
 
     // Conversation-only sessions (or empty toolAllowList) get NO tools — pure text conversation.
     // When toolAllowList has items, it's a restricted session (e.g. buddy review).
@@ -1576,6 +1597,7 @@ export class ProcessManager {
     this.approvalManager.cancelSession(sessionId);
     this.ownerQuestionManager.cancelSession(sessionId);
     this.sessionMeta.delete(sessionId);
+    this.keepAliveTtlOverrides.delete(sessionId);
   }
 
   /**
@@ -1710,6 +1732,7 @@ export class ProcessManager {
 
     this.eventBus.clearAllSessionSubscribers();
     this.sessionMeta.clear();
+    this.keepAliveTtlOverrides.clear();
   }
 
   private handleApiOutage(sessionId: string): void {
@@ -2138,7 +2161,8 @@ export class ProcessManager {
     accumulateActiveDuration(this.db, sessionId);
 
     // Start keep-alive TTL — process will be killed if no new message arrives
-    this.timerManager.startKeepAliveTtl(sessionId, KEEP_ALIVE_TTL_MS);
+    const effectiveTtl = this.keepAliveTtlOverrides.get(sessionId) ?? KEEP_ALIVE_TTL_MS;
+    this.timerManager.startKeepAliveTtl(sessionId, effectiveTtl);
 
     // Clear the normal inactivity timeout — warm processes use keep-alive TTL instead
     this.timerManager.clearSessionTimeout(sessionId);

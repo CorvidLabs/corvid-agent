@@ -159,6 +159,8 @@ export interface FooterContext {
   sessionId?: string;
   projectName?: string;
   status?: string;
+  /** Session type label shown in footer (e.g. 'mention · 5m'). */
+  sessionType?: string;
 }
 
 /** Stats that can be appended to the footer on completion embeds. */
@@ -214,6 +216,9 @@ export function buildFooterText(
   cumulativeTurns?: number,
 ): string {
   const parts: string[] = [];
+  if (ctx.sessionType) {
+    parts.push(ctx.sessionType);
+  }
   if (ctx.agentModel) {
     parts.push(shortenModelName(ctx.agentModel));
   }
