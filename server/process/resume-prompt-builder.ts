@@ -20,7 +20,12 @@ interface SessionMeta {
 /**
  * Build a resume prompt from session history, observations, and context.
  *
- * Assembles:
+ * This is a COLD-START-ONLY operation. Warm turns (where the SDK process is
+ * still alive and has full conversation history in memory) must pass
+ * `isWarmTurn: true`, which short-circuits the function and returns just the
+ * new prompt — no reconstruction overhead.
+ *
+ * Assembles on cold start:
  * - Previous context summary (from context resets)
  * - Recent observations for the agent (boosted on access)
  * - Conversation history (last 20 messages, each truncated to 2000 chars)
@@ -32,7 +37,12 @@ export function buildResumePrompt(
   session: Session,
   meta: SessionMeta | undefined,
   newPrompt?: string,
+  isWarmTurn?: boolean,
 ): string {
+  // Warm turns skip all reconstruction — SDK process already has full context.
+  if (isWarmTurn) {
+    return newPrompt ?? session.initialPrompt ?? '';
+  }
   const messages = getSessionMessages(db, session.id);
 
   // Check for a pending server-restart confirmation and clear it

@@ -986,7 +986,8 @@ export class ProcessManager {
         if (prompt) {
           const sent = this.sendMessage(session.id, prompt);
           if (sent) {
-            // Warm path succeeded — reset keep-alive TTL
+            // Warm path: message delivered to live process — no context reconstruction.
+            log.debug(`Session ${session.id}: warm turn — context reconstruction skipped`);
             if (proc.isWarm()) {
               this.timerManager.clearKeepAliveTtl(session.id);
             }
@@ -1375,6 +1376,8 @@ export class ProcessManager {
   }
 
   private buildResumePrompt(session: Session, newPrompt?: string): { prompt: string; activeTurns: number } {
+    // Cold-start path only — warm turns must not reach here (they return early in resumeProcess).
+    log.debug(`Session ${session.id}: cold start — rebuilding context from DB`);
     const messages = getSessionMessages(this.db, session.id);
     const meta = this.sessionMeta.get(session.id);
 
