@@ -204,8 +204,8 @@ function shortenModelName(model: string): string {
 
 /**
  * Build a compact footer string with session context.
- * Format: `opus-4.6 · XXXXXXXX · status | T:5(23) | 🟢 32% (64k/200k)`
- * Agent name is in the embed author; project name is in the thread title — both omitted.
+ * Format: `corvid-agent · opus-4.6 · XXXXXXXX · status | T:5(23) | 🟢 32% (64k/200k)`
+ * Agent name is in the embed author; project name is included first when present.
  * When cumulativeTurns equals active turns, shows just `T:5`.
  * Segments are omitted when their value is not provided.
  */
@@ -216,6 +216,9 @@ export function buildFooterText(
   cumulativeTurns?: number,
 ): string {
   const parts: string[] = [];
+  if (ctx.projectName) {
+    parts.push(ctx.projectName);
+  }
   if (ctx.sessionType) {
     parts.push(ctx.sessionType);
   }
@@ -747,7 +750,11 @@ export async function sendMessageWithFiles(
   }
 }
 
-/** Re-export splitEmbedDescription and collapseCodeBlocks for use by other modules. */
+export {
+  CorvidEmbed,
+  EMBED_BUTTONS,
+  EMBED_COLORS,
+  type EmbedAgentIdentity,
+  type EmbedButtonKey,
+} from './embed-builder';
 export { collapseCodeBlocks, splitEmbedDescription } from './message-formatter';
-
-export { CorvidEmbed, EMBED_BUTTONS, EMBED_COLORS, type EmbedAgentIdentity, type EmbedButtonKey } from './embed-builder';

@@ -5,8 +5,8 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentText } from '../../process/types';
 import {
   agentColor,
-  CorvidEmbed,
   type ContextUsage,
+  CorvidEmbed,
   collapseCodeBlocks,
   type EmbedAgentIdentity,
   type FooterContext,

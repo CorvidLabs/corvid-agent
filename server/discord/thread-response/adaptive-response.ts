@@ -5,8 +5,8 @@ import type { ProcessManager } from '../../process/manager';
 import { extractContentImageUrls, extractContentText } from '../../process/types';
 import {
   agentColor,
-  CorvidEmbed,
   type ContextUsage,
+  CorvidEmbed,
   collapseCodeBlocks,
   type DiscordFileAttachment,
   type EmbedAgentIdentity,
@@ -94,9 +94,7 @@ export function subscribeForAdaptiveInlineResponse(
     log.warn('Typing indicator safety timeout reached (adaptive)', { sessionId, channelId });
     if (!receivedAnyActivity) {
       const { embed: timeoutEmbed } = new CorvidEmbed()
-        .setDescription(
-          'The agent appears to be taking too long. It may still be working — send a message to check.',
-        )
+        .setDescription('The agent appears to be taking too long. It may still be working — send a message to check.')
         .setColor(0xf0b232)
         .build();
       sendEmbed(delivery, botToken, channelId, timeoutEmbed).catch((err) => {
@@ -282,7 +280,9 @@ export function subscribeForAdaptiveInlineResponse(
           // out of the channel and into a dedicated thread (reduces channel spam).
           const expiresAtUnix = Math.floor(Date.now() / 1000) + 5 * 60;
           const continueBuilder = new CorvidEmbed()
-            .setDescription(`Reply to continue here, or start a thread for a longer conversation. Expires <t:${expiresAtUnix}:R>.`)
+            .setDescription(
+              `Reply to continue here, or start a thread for a longer conversation. Expires <t:${expiresAtUnix}:R>.`,
+            )
             .setColor(0x95a5a6)
             .setAgent(authorIdentity)
             .setModel(agentModel)

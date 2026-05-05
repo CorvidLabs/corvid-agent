@@ -346,10 +346,7 @@ export class CorvidEmbed {
    * Used for live tool execution status updates.
    */
   static toolStatus(message: string, ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    const b = new CorvidEmbed()
-      .setDescription(`⏳ ${message}`)
-      .setColor(EMBED_COLORS.neutral)
-      .setStatus('working...');
+    const b = new CorvidEmbed().setDescription(`⏳ ${message}`).setColor(EMBED_COLORS.neutral).setStatus('working...');
     return CorvidEmbed.applyContext(b, ctx, author);
   }
 
@@ -369,10 +366,7 @@ export class CorvidEmbed {
    * Used when editing the progress embed after a result arrives.
    */
   static done(ctx: FooterContext, author: EmbedAgentIdentity): CorvidEmbed {
-    const b = new CorvidEmbed()
-      .setDescription('✅ Done')
-      .setColor(EMBED_COLORS.success)
-      .setStatus('done');
+    const b = new CorvidEmbed().setDescription('✅ Done').setColor(EMBED_COLORS.success).setStatus('done');
     return CorvidEmbed.applyContext(b, ctx, author);
   }
 
@@ -407,13 +401,14 @@ export class CorvidEmbed {
    * Maps known error types (context_exhausted, credits_exhausted, timeout, crash,
    * spawn_error) to user-facing titles, descriptions, and colors.
    */
-  static error(errorType: string, ctx: FooterContext, author: EmbedAgentIdentity, fallbackMessage?: string): CorvidEmbed {
+  static error(
+    errorType: string,
+    ctx: FooterContext,
+    author: EmbedAgentIdentity,
+    fallbackMessage?: string,
+  ): CorvidEmbed {
     const { title, description, color } = sessionErrorEmbed(errorType, fallbackMessage);
-    const b = new CorvidEmbed()
-      .setTitle(title)
-      .setDescription(description)
-      .setColor(color)
-      .setStatus(errorType);
+    const b = new CorvidEmbed().setTitle(title).setDescription(description).setColor(color).setStatus(errorType);
     return CorvidEmbed.applyContext(b, ctx, author);
   }
 

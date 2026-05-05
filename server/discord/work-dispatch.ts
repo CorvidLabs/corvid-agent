@@ -159,9 +159,7 @@ export async function sendTaskResult(
       }>),
       { name: 'Iterations', value: String(task.iterationCount), inline: true },
     ];
-    const { embed: failedEmbed } = CorvidEmbed.workTaskFailed(task.id, task.description)
-      .setFields(errorFields)
-      .build();
+    const { embed: failedEmbed } = CorvidEmbed.workTaskFailed(task.id, task.description).setFields(errorFields).build();
     await sendMessageWithEmbed(
       ctx.delivery,
       ctx.config.botToken,

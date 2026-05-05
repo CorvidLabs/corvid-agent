@@ -6,14 +6,9 @@
  * blocks, all preset factory methods, and edge cases.
  */
 import { describe, expect, test } from 'bun:test';
-import {
-  CorvidEmbed,
-  EMBED_BUTTONS,
-  EMBED_COLORS,
-  type EmbedAgentIdentity,
-} from '../discord/embed-builder';
-import { ButtonStyle } from '../discord/types';
+import { CorvidEmbed, EMBED_BUTTONS, EMBED_COLORS, type EmbedAgentIdentity } from '../discord/embed-builder';
 import type { FooterContext } from '../discord/embeds';
+import { ButtonStyle } from '../discord/types';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -148,10 +143,7 @@ describe('CorvidEmbed builder — basic fields', () => {
       { name: 'A', value: '1' },
       { name: 'B', value: '2', inline: true },
     ];
-    const { embed } = new CorvidEmbed()
-      .addField('Old', 'field')
-      .setFields(fields)
-      .build();
+    const { embed } = new CorvidEmbed().addField('Old', 'field').setFields(fields).build();
     expect(embed.fields).toHaveLength(2);
     expect(embed.fields![0].name).toBe('A');
   });
@@ -189,13 +181,11 @@ describe('CorvidEmbed builder — footer', () => {
   });
 
   test('footer excludes agent name (shown in embed author instead)', () => {
-    const { embed } = new CorvidEmbed()
-      .setAgent({ agentName: 'Rook' })
-      .build();
+    const { embed } = new CorvidEmbed().setAgent({ agentName: 'Rook' }).build();
     expect(embed.footer?.text).toBe('');
   });
 
-  test('footer includes shortened model, session, and status', () => {
+  test('footer includes project, shortened model, session, and status', () => {
     const { embed } = new CorvidEmbed()
       .setAgent(AUTHOR)
       .setModel('claude-sonnet-4-6')
@@ -204,10 +194,11 @@ describe('CorvidEmbed builder — footer', () => {
       .setStatus('thinking')
       .build();
     const footer = embed.footer!.text;
+    expect(footer).toContain('corvid-agent');
     expect(footer).toContain('sonnet-4.6');
     expect(footer).toContain('abcdef12');
     expect(footer).not.toContain('Rook');
-    expect(footer).not.toContain('corvid-agent');
+    expect(footer).toContain('corvid-agent');
     expect(footer).toContain('thinking');
   });
 
@@ -228,18 +219,12 @@ describe('CorvidEmbed builder — footer', () => {
   });
 
   test('withTurns adds turn counter to footer', () => {
-    const { embed } = new CorvidEmbed()
-      .setAgent({ agentName: 'Rook' })
-      .withTurns(5)
-      .build();
+    const { embed } = new CorvidEmbed().setAgent({ agentName: 'Rook' }).withTurns(5).build();
     expect(embed.footer!.text).toContain('T:5');
   });
 
   test('withTurns with cumulativeTurns shows T:x(n) format', () => {
-    const { embed } = new CorvidEmbed()
-      .setAgent({ agentName: 'Rook' })
-      .withTurns(5, 23)
-      .build();
+    const { embed } = new CorvidEmbed().setAgent({ agentName: 'Rook' }).withTurns(5, 23).build();
     expect(embed.footer!.text).toContain('T:5(23)');
   });
 
@@ -256,10 +241,7 @@ describe('CorvidEmbed builder — footer', () => {
   });
 
   test('withStats with cumulativeTurns shows cumulative in footer', () => {
-    const { embed } = new CorvidEmbed()
-      .setAgent({ agentName: 'Rook' })
-      .withStats({ turns: 5, tools: 10 }, 23)
-      .build();
+    const { embed } = new CorvidEmbed().setAgent({ agentName: 'Rook' }).withStats({ turns: 5, tools: 10 }, 23).build();
     const footer = embed.footer!.text;
     expect(footer).toContain('5 turns (23 total)');
   });
@@ -288,9 +270,7 @@ describe('CorvidEmbed builder — author', () => {
   });
 
   test('agent without displayIcon does not prepend emoji to name', () => {
-    const { embed } = new CorvidEmbed()
-      .setAgent({ agentName: 'Rook' })
-      .build();
+    const { embed } = new CorvidEmbed().setAgent({ agentName: 'Rook' }).build();
     expect(embed.author?.name).toBe('Rook');
   });
 
@@ -313,17 +293,13 @@ describe('CorvidEmbed builder — author', () => {
 
 describe('CorvidEmbed builder — buttons', () => {
   test('withButtons produces action row components', () => {
-    const { components } = new CorvidEmbed()
-      .withButtons(['new_session', 'archive'])
-      .build();
+    const { components } = new CorvidEmbed().withButtons(['new_session', 'archive']).build();
     expect(components).toHaveLength(1);
     expect(components![0].components).toHaveLength(2);
   });
 
   test('button labels match EMBED_BUTTONS definitions', () => {
-    const { components } = new CorvidEmbed()
-      .withButtons(['new_session', 'create_issue', 'archive'])
-      .build();
+    const { components } = new CorvidEmbed().withButtons(['new_session', 'create_issue', 'archive']).build();
     const labels = components![0].components.map((b) => b.label);
     expect(labels).toContain('New Session');
     expect(labels).toContain('Create Issue');
@@ -331,9 +307,7 @@ describe('CorvidEmbed builder — buttons', () => {
   });
 
   test('button customIds match EMBED_BUTTONS definitions', () => {
-    const { components } = new CorvidEmbed()
-      .withButtons(['resume'])
-      .build();
+    const { components } = new CorvidEmbed().withButtons(['resume']).build();
     expect(components![0].components[0].custom_id).toBe('resume_thread');
   });
 
@@ -360,9 +334,7 @@ describe('CorvidEmbed builder — buttons', () => {
   });
 
   test('button emoji is set on action row component', () => {
-    const { components } = new CorvidEmbed()
-      .withButtons(['archive'])
-      .build();
+    const { components } = new CorvidEmbed().withButtons(['archive']).build();
     expect(components![0].components[0].emoji?.name).toBe('📦');
   });
 });
