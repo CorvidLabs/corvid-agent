@@ -5,6 +5,7 @@ status: draft
 files:
   - server/github/off-limits.ts
   - server/github/operations.ts
+  - server/github/pr-body.ts
 db_tables: []
 depends_on:
   - specs/lib/infra/infra.spec.md
@@ -26,6 +27,16 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | `isRepoOffLimits` | `repo: string` | `boolean` | Returns true if the repo is on the off-limits blocklist |
 | `assertRepoAllowed` | `repo: string` | `void` | Throws if the repo is off-limits; call before any write operation |
 | `_resetCache` | (none) | `void` | Resets the in-memory blocklist cache (for testing) |
+
+#### pr-body.ts
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `formatPrBody` | `opts: PrBodyOptions` | `string` | Formats a standardized PR body with Summary, Changes, and Test Plan sections |
+
+| Type | Description |
+|------|-------------|
+| `PrBodyOptions` | Interface with fields: summary (string[]), changes? (string[]), testPlan? (string[]) |
 
 #### operations.ts
 
@@ -119,6 +130,7 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | `server/webhooks/service` | `isGitHubConfigured` and GitHub operations for webhook-triggered actions |
 | `server/scheduler/service` | GitHub operations for scheduled tasks (review PRs, star repos, etc.) |
 | `server/work/service` | `createPr`, `assertRepoAllowed` for work task PR creation |
+| `server/work/session-lifecycle` | `formatPrBody` for standardized PR body formatting in fallback PR creation |
 
 ## Change Log
 

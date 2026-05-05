@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { Database } from 'bun:sqlite';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { addPlatformLink, createContact } from '../db/contacts';
+import { runMigrations } from '../db/schema';
 import type { McpToolContext } from '../mcp/tool-handlers';
 
 // ── Mock the github/operations module before importing handlers ──────────
@@ -85,9 +88,14 @@ const {
   handleGitHubFollowUser,
 } = await import('../mcp/tool-handlers');
 
-const { friendlyModelName, formatAgentSignature, formatCoAuthoredBy, formatHumanCoAuthoredBy } = await import(
-  '../mcp/tool-handlers/github'
-);
+const {
+  friendlyModelName,
+  formatAgentSignature,
+  formatCoAuthoredBy,
+  formatHumanCoAuthoredBy,
+  resolveCollaborator,
+  resolveRequestedBy,
+} = await import('../mcp/tool-handlers/github');
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1008,5 +1016,106 @@ describe('formatAgentSignature with collaborators', () => {
   test('omits collaborator line when collaborators is undefined', () => {
     const sig = formatAgentSignature({ name: 'Rook', model: 'claude-opus-4-6' });
     expect(sig).not.toContain('Requested by');
+  });
+});
+
+// ── resolveCollaborator ──────────────────────────────────────────────────
+
+describe('resolveCollaborator', () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+  });
+
+  afterEach(() => db.close());
+
+  test('returns null when contact not found', () => {
+    expect(resolveCollaborator(db, 'discord', '999')).toBeNull();
+  });
+
+  test('returns displayName and githubUsername when GitHub link exists', () => {
+    const contact = createContact(db, '', 'Leif');
+    addPlatformLink(db, '', contact.id, 'discord', '181969874455756800');
+    addPlatformLink(db, '', contact.id, 'github', 'kyntrin');
+
+    const result = resolveCollaborator(db, 'discord', '181969874455756800');
+    expect(result).toEqual({ displayName: 'Leif', githubUsername: 'kyntrin' });
+  });
+
+  test('returns displayName without githubUsername when no GitHub link', () => {
+    const contact = createContact(db, '', 'Leif');
+    addPlatformLink(db, '', contact.id, 'discord', '181969874455756800');
+
+    const result = resolveCollaborator(db, 'discord', '181969874455756800');
+    expect(result).toEqual({ displayName: 'Leif', githubUsername: undefined });
+  });
+});
+
+// ── resolveRequestedBy ───────────────────────────────────────────────────
+
+describe('resolveRequestedBy', () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.exec('PRAGMA foreign_keys = ON');
+    runMigrations(db);
+  });
+
+  afterEach(() => db.close());
+
+  function makeDbCtx(): McpToolContext {
+    return makeCtx({ db });
+  }
+
+  test('returns undefined when requestedBy is not provided', () => {
+    expect(resolveRequestedBy(makeDbCtx())).toBeUndefined();
+  });
+
+  test('returns undefined for empty string', () => {
+    expect(resolveRequestedBy(makeDbCtx(), '')).toBeUndefined();
+  });
+
+  test('numeric-only Discord ID falls back without githubUsername', () => {
+    const result = resolveRequestedBy(makeDbCtx(), '181969874455756800');
+    expect(result).toEqual([{ displayName: '181969874455756800', githubUsername: undefined }]);
+  });
+
+  test('@username fallback sets githubUsername', () => {
+    const result = resolveRequestedBy(makeDbCtx(), '@kyntrin');
+    expect(result).toEqual([{ displayName: 'kyntrin', githubUsername: 'kyntrin' }]);
+  });
+
+  test('plain username fallback sets githubUsername', () => {
+    const result = resolveRequestedBy(makeDbCtx(), 'kyntrin');
+    expect(result).toEqual([{ displayName: 'kyntrin', githubUsername: 'kyntrin' }]);
+  });
+
+  test('resolves contact by Discord ID when in contacts DB', () => {
+    const contact = createContact(db, '', 'Leif');
+    addPlatformLink(db, '', contact.id, 'discord', '181969874455756800');
+    addPlatformLink(db, '', contact.id, 'github', 'kyntrin');
+
+    const result = resolveRequestedBy(makeDbCtx(), '181969874455756800');
+    expect(result).toEqual([{ displayName: 'Leif', githubUsername: 'kyntrin' }]);
+  });
+
+  test('resolves contact by GitHub username when in contacts DB', () => {
+    const contact = createContact(db, '', 'Leif');
+    addPlatformLink(db, '', contact.id, 'github', 'kyntrin');
+
+    const result = resolveRequestedBy(makeDbCtx(), '@kyntrin');
+    expect(result).toEqual([{ displayName: 'Leif', githubUsername: 'kyntrin' }]);
+  });
+
+  test('handles comma-separated list with mixed types', () => {
+    const result = resolveRequestedBy(makeDbCtx(), '@kyntrin, 181969874455756800');
+    expect(result).toEqual([
+      { displayName: 'kyntrin', githubUsername: 'kyntrin' },
+      { displayName: '181969874455756800', githubUsername: undefined },
+    ]);
   });
 });

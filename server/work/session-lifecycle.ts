@@ -4,6 +4,7 @@ import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { clearWorktreeDir, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
+import { formatPrBody } from '../github/pr-body';
 import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
 import {
@@ -262,7 +263,12 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
 
     // Create PR via gh CLI
     const title = `[Agent] ${task.description.slice(0, 60)}`;
-    const baseBody = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sanitizeSessionSummary(sessionOutput, 300)}`;
+    const sessionSummary = sanitizeSessionSummary(sessionOutput, 300);
+    const baseBody = formatPrBody({
+      summary: [task.description],
+      changes: sessionSummary ? [sessionSummary] : undefined,
+      testPlan: ['Review automated changes', 'Verify CI passes'],
+    });
     const body = baseBody + formatAgentSignature(agent, taskId, collaborators.length > 0 ? collaborators : undefined);
     log.info('Fallback: creating PR', { taskId, branch: task.branchName });
 
