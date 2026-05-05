@@ -54,7 +54,7 @@ export function subscribeForAdaptiveInlineResponse(
   const TYPING_TIMEOUT_MS = 4 * 60 * 1000;
   let receivedAnyActivity = false;
   const color = hexColorToInt(displayColor) ?? agentColor(agentName);
-  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName };
+  const footerCtx: FooterContext = { agentName, agentModel, sessionId, projectName, sessionType: 'mention · 5m' };
   const authorIdentity: EmbedAgentIdentity = { agentName, displayIcon, avatarUrl };
 
   // Progress embed state — only created when tool use is detected

@@ -31,6 +31,7 @@ function createMockProcessManager() {
     resumeProcess: mock(() => {}),
     stopProcess: mock(() => {}),
     isRunning: mock(() => true),
+    setKeepAliveTtl: mock(() => {}),
   } as unknown as import('../process/manager').ProcessManager;
 }
 

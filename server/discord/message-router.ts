@@ -13,7 +13,6 @@ import { getChannelProjectId, setChannelProjectId } from '../db/discord-channel-
 import { updateDiscordConfig } from '../db/discord-config';
 import {
   getChannelMessageHistory,
-  getLatestMentionSessionByChannel,
   getMentionSession,
   saveMentionSession,
   updateMentionSessionActivity,
@@ -61,6 +60,9 @@ const log = createLogger('DiscordMessageHandler');
 
 /** Maximum number of bot message→session mappings to keep for mention-reply context. */
 const MAX_MENTION_SESSIONS = 500;
+
+/** Keep-alive TTL for mention sessions — shorter than thread sessions since mentions are quick interactions. */
+const MENTION_KEEP_ALIVE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Cooldown for permission-denial replies: only notify a user once per window. */
 const PERM_DENY_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
@@ -399,35 +401,7 @@ export async function handleMessage(ctx: MessageHandlerContext, data: DiscordMes
       );
       return;
     }
-    // If we can't find the session by bot message ID, fall through to channel fallback below
-  }
-
-  // Channel-based fallback: if a user sends a message in a channel with a recent
-  // mention session (within 60 min), resume that session even without a reply reference.
-  // This handles the common case where users type follow-ups without using Discord's reply.
-  if (!isReplyToBot || !data.message_reference?.message_id) {
-    const channelSession = getLatestMentionSessionByChannel(ctx.db, channelId);
-    if (channelSession) {
-      log.info('Channel-based mention session fallback', {
-        channelId,
-        sessionId: channelSession.sessionId,
-        userId,
-      });
-      await handleMentionReplyResume(
-        ctx,
-        channelId,
-        userId,
-        data.id,
-        text,
-        channelSession,
-        permLevel,
-        data.mentions,
-        data.author.id,
-        data.author.username,
-        data.attachments,
-      );
-      return;
-    }
+    // Reply references a bot message we don't have a session for — fall through to new session
   }
 
   // In public mode, BASIC-tier users who @mention the bot should use /message
@@ -625,7 +599,8 @@ async function handleMentionReply(
     attachments,
   );
   const promptWithContext = previousContext ? `${previousContext}\n\n${textWithUrls}` : textWithUrls;
-  ctx.processManager.startProcess(session, promptWithContext);
+  ctx.processManager.startProcess(session, promptWithContext, { skipSkillPrompt: true });
+  ctx.processManager.setKeepAliveTtl(session.id, MENTION_KEEP_ALIVE_TTL_MS);
 
   // Record inbound Discord message as a short-term observation for context retention
   recordObservation(ctx.db, {
@@ -727,6 +702,13 @@ async function handleMentionReplyResume(
   });
   const sent = ctx.processManager.sendMessage(sessionId, contextualContent);
   if (!sent) {
+    // Session expired — notify user that context may be summarized
+    sendEmbed(ctx.delivery, ctx.config.botToken, channelId, {
+      description: 'Resuming from earlier — context may be summarized.',
+      color: 0x95a5a6,
+      footer: { text: 'mention session resumed' },
+    }).catch(() => {});
+
     // resumeProcess only accepts strings — include attachment URLs so images aren't lost
     const resumeText =
       typeof contextualContent === 'string'
@@ -737,6 +719,7 @@ async function handleMentionReplyResume(
     const channelContext = buildChannelContext(ctx.db, channelId);
     const resumeTextWithContext = channelContext ? `${channelContext}\n\n${resumeText}` : resumeText;
     ctx.processManager.resumeProcess(session, resumeTextWithContext);
+    ctx.processManager.setKeepAliveTtl(sessionId, MENTION_KEEP_ALIVE_TTL_MS);
 
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session
     if (!ctx.processManager.isRunning(sessionId)) {
