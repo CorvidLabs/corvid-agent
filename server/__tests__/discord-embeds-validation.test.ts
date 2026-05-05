@@ -46,7 +46,7 @@ describe('assertInteractionToken', () => {
 });
 
 describe('buildFooterText', () => {
-  test('includes model, session, and status (no agent name or project)', () => {
+  test('includes project, model, session, and status (no agent name)', () => {
     const result = buildFooterText({
       agentName: 'Corvid',
       agentModel: 'claude-opus-4-6',
@@ -54,7 +54,7 @@ describe('buildFooterText', () => {
       sessionId: 'abcdef1234567890',
       status: 'running',
     });
-    expect(result).toBe('opus-4.6 · abcdef12 · running');
+    expect(result).toBe('my-project · opus-4.6 · abcdef12 · running');
   });
 
   test('returns shortened model when no other context', () => {
@@ -62,13 +62,13 @@ describe('buildFooterText', () => {
     expect(result).toBe('opus-4.6');
   });
 
-  test('omits projectName from footer', () => {
+  test('includes projectName in footer', () => {
     const result = buildFooterText({
       agentName: 'Corvid',
       agentModel: 'opus',
       projectName: 'my-project',
     });
-    expect(result).toBe('opus');
+    expect(result).toBe('my-project · opus');
   });
 
   test('includes sessionId without sid: prefix', () => {

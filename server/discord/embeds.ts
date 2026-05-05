@@ -757,5 +757,4 @@ export {
   type EmbedAgentIdentity,
   type EmbedButtonKey,
 } from './embed-builder';
-/** Re-export splitEmbedDescription and collapseCodeBlocks for use by other modules. */
 export { collapseCodeBlocks, splitEmbedDescription } from './message-formatter';
