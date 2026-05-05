@@ -74,9 +74,12 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `friendlyModelName` | `(model: string)` | `string` | Map a raw model ID (e.g. `claude-opus-4-6`) to a human-friendly name (e.g. `Opus 4.6`) |
-| `formatAgentSignature` | `(agent: { name, model } \| null \| undefined)` | `string` | Format an identity footer from an agent object; returns empty string for null/undefined |
+| `formatAgentSignature` | `(agent: { name, model } \| null \| undefined, taskId?, collaborators?)` | `string` | Format an identity footer from an agent object with optional human collaborator attribution; returns empty string for null/undefined |
 | `formatCoAuthoredBy` | `(agent: { name, model } \| null \| undefined)` | `string` | Format a Co-Authored-By git trailer from an agent object; returns empty string for null/undefined |
-| `buildAgentSignature` | `(ctx: McpToolContext)` | `string` | Look up agent from DB and build identity footer; returns empty string on failure |
+| `formatHumanCoAuthoredBy` | `(collaborator: HumanCollaborator)` | `string` | Format a Co-Authored-By git trailer for a human collaborator, using their GitHub noreply email if available |
+| `buildAgentSignature` | `(ctx: McpToolContext, collaborators?)` | `string` | Look up agent from DB and build identity footer with optional human collaborator attribution; returns empty string on failure |
+| `resolveCollaborator` | `(db: Database, platform: ContactPlatform, platformId: string)` | `HumanCollaborator \| null` | Look up a human collaborator from the contacts DB by platform ID, resolving their GitHub username if linked |
+| `HumanCollaborator` | interface | `{ displayName, githubUsername? }` | Represents a human collaborator for attribution in PRs, issues, and commits |
 
 ### Exported Functions
 
@@ -156,7 +159,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 6. **All handlers return `CallToolResult`**: Every handler returns `{ content: [{ type: 'text', text }] }` via `textResult()` or `errorResult()` helpers
 7. **Service availability checks**: Handlers check for optional services (e.g. `ctx.workTaskService`, `ctx.schedulerService`) before use and return error results if missing
 8. **Status emission**: Long-running handlers call `ctx.emitStatus?.()` to provide progress updates to the UI
-9. **Agent identity signature**: GitHub write operations (`handleGitHubCreatePr`, `handleGitHubCreateIssue`, `handleGitHubCommentOnPr`, `handleGitHubReviewPr`) append an agent identity footer to the body via `buildAgentSignature()`. If the agent cannot be resolved, no signature is appended (fail-open)
+9. **Agent identity signature**: GitHub write operations (`handleGitHubCreatePr`, `handleGitHubCreateIssue`, `handleGitHubCommentOnPr`, `handleGitHubReviewPr`) append an agent identity footer to the body via `buildAgentSignature()`. If the agent cannot be resolved, no signature is appended (fail-open). PR and issue creation tools accept an optional `requested_by` parameter to attribute human collaborators — resolved via the contacts DB and displayed as `Requested by: @username` in the footer
 
 ## Behavioral Examples
 

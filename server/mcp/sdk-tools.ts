@@ -678,6 +678,10 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         body: z.string().describe('PR description/body'),
         head: z.string().describe('Source branch name'),
         base: z.string().optional().describe('Target branch name (default "main")'),
+        requested_by: z
+          .string()
+          .optional()
+          .describe('GitHub username(s) or Discord ID(s) of the human collaborator(s), comma-separated'),
       },
       async (args) => handleGitHubCreatePr(ctx, args),
     ),
@@ -700,6 +704,10 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
         title: z.string().describe('Issue title'),
         body: z.string().describe('Issue description/body'),
         labels: z.array(z.string()).optional().describe('Labels to apply to the issue'),
+        requested_by: z
+          .string()
+          .optional()
+          .describe('GitHub username(s) or Discord ID(s) of the human collaborator(s), comma-separated'),
       },
       async (args) => handleGitHubCreateIssue(ctx, args),
     ),
