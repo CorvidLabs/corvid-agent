@@ -185,7 +185,7 @@ describe('CorvidEmbed builder — footer', () => {
     expect(embed.footer?.text).toBe('');
   });
 
-  test('footer includes shortened model, session, and status', () => {
+  test('footer includes project, shortened model, session, and status', () => {
     const { embed } = new CorvidEmbed()
       .setAgent(AUTHOR)
       .setModel('claude-sonnet-4-6')
@@ -194,6 +194,7 @@ describe('CorvidEmbed builder — footer', () => {
       .setStatus('thinking')
       .build();
     const footer = embed.footer!.text;
+    expect(footer).toContain('corvid-agent');
     expect(footer).toContain('sonnet-4.6');
     expect(footer).toContain('abcdef12');
     expect(footer).not.toContain('Rook');
