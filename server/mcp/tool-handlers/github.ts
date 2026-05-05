@@ -1,5 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getAgent } from '../../db/agents';
+import { type ContactPlatform, findContactByPlatformId } from '../../db/contacts';
 import { assertRepoAllowed } from '../../github/off-limits';
 import * as github from '../../github/operations';
 import { checkInternPrGuard } from '../../work/intern-guard';
@@ -10,6 +11,29 @@ import {
 } from '../scheduler-tool-gating';
 import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
+
+export interface HumanCollaborator {
+  displayName: string;
+  githubUsername?: string;
+}
+
+export function resolveCollaborator(
+  db: import('bun:sqlite').Database,
+  platform: ContactPlatform,
+  platformId: string,
+): HumanCollaborator | null {
+  const contact = findContactByPlatformId(db, '', platform, platformId);
+  if (!contact) return null;
+  const githubLink = contact.links?.find((l) => l.platform === 'github');
+  return { displayName: contact.displayName, githubUsername: githubLink?.platformId };
+}
+
+export function formatHumanCoAuthoredBy(collaborator: HumanCollaborator): string {
+  if (collaborator.githubUsername) {
+    return `Co-Authored-By: ${collaborator.displayName} <${collaborator.githubUsername}@users.noreply.github.com>`;
+  }
+  return `Co-Authored-By: ${collaborator.displayName}`;
+}
 
 /** Map a raw model ID to a human-friendly name for GitHub signatures. */
 export function friendlyModelName(model: string): string {
@@ -31,12 +55,18 @@ export function friendlyModelName(model: string): string {
 export function formatAgentSignature(
   agent: { name: string; model: string } | null | undefined,
   taskId?: string,
+  collaborators?: HumanCollaborator[],
 ): string {
   if (!agent) return '';
   const modelDisplay = friendlyModelName(agent.model);
   const parts = [`Agent: ${agent.name}`, `Model: ${modelDisplay}`];
   if (taskId) parts.push(`Task: ${taskId}`);
-  return `\n\n---\n\u{1F916} ${parts.join(' | ')}`;
+  let sig = `\n\n---\n\u{1F916} ${parts.join(' | ')}`;
+  if (collaborators?.length) {
+    const names = collaborators.map((c) => (c.githubUsername ? `@${c.githubUsername}` : c.displayName));
+    sig += `\n\u{1F464} Requested by: ${names.join(', ')}`;
+  }
+  return sig;
 }
 
 /** Format a Co-Authored-By trailer for git commits (#1576). */
@@ -47,10 +77,10 @@ export function formatCoAuthoredBy(agent: { name: string; model: string } | null
 }
 
 /** Build an agent identity signature footer by looking up the agent from the DB. */
-export function buildAgentSignature(ctx: McpToolContext): string {
+export function buildAgentSignature(ctx: McpToolContext, collaborators?: HumanCollaborator[]): string {
   try {
     const agent = getAgent(ctx.db, ctx.agentId);
-    return formatAgentSignature(agent);
+    return formatAgentSignature(agent, undefined, collaborators);
   } catch {
     return '';
   }
@@ -67,6 +97,34 @@ function enforceSchedulerGuards(ctx: McpToolContext, toolName: string, repo: str
     if (err) return errorResult(err);
   }
   return null;
+}
+
+/**
+ * Resolve a `requested_by` string into collaborator info.
+ * Accepts a GitHub username (with or without @), a Discord ID, or a display name.
+ */
+function resolveRequestedBy(ctx: McpToolContext, requestedBy?: string): HumanCollaborator[] | undefined {
+  if (!requestedBy) return undefined;
+  const names = requestedBy
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const collaborators: HumanCollaborator[] = [];
+  for (const name of names) {
+    const cleaned = name.startsWith('@') ? name.slice(1) : name;
+    const byGithub = resolveCollaborator(ctx.db, 'github', cleaned);
+    if (byGithub) {
+      collaborators.push(byGithub);
+      continue;
+    }
+    const byDiscord = resolveCollaborator(ctx.db, 'discord', cleaned);
+    if (byDiscord) {
+      collaborators.push(byDiscord);
+      continue;
+    }
+    collaborators.push({ displayName: cleaned, githubUsername: cleaned });
+  }
+  return collaborators.length > 0 ? collaborators : undefined;
 }
 
 export async function handleGitHubStarRepo(_ctx: McpToolContext, args: { repo: string }): Promise<CallToolResult> {
@@ -127,7 +185,7 @@ export async function handleGitHubListPrs(
 
 export async function handleGitHubCreatePr(
   ctx: McpToolContext,
-  args: { repo: string; title: string; body: string; head: string; base?: string },
+  args: { repo: string; title: string; body: string; head: string; base?: string; requested_by?: string },
 ): Promise<CallToolResult> {
   try {
     assertRepoAllowed(args.repo);
@@ -145,7 +203,8 @@ export async function handleGitHubCreatePr(
     } catch {
       // Fail open: if the agent lookup fails, allow the operation to proceed.
     }
-    const bodyWithSig = args.body + buildAgentSignature(ctx);
+    const collaborators = resolveRequestedBy(ctx, args.requested_by);
+    const bodyWithSig = args.body + buildAgentSignature(ctx, collaborators);
     const result = await github.createPr(args.repo, args.title, bodyWithSig, args.head, args.base ?? 'main');
     if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
     return textResult(`PR created: ${result.prUrl ?? 'success'}`);
@@ -177,7 +236,7 @@ export async function handleGitHubReviewPr(
 
 export async function handleGitHubCreateIssue(
   ctx: McpToolContext,
-  args: { repo: string; title: string; body: string; labels?: string[] },
+  args: { repo: string; title: string; body: string; labels?: string[]; requested_by?: string },
 ): Promise<CallToolResult> {
   try {
     assertRepoAllowed(args.repo);
@@ -191,7 +250,8 @@ export async function handleGitHubCreateIssue(
         effectiveLabels.push(SCHEDULER_ESCALATION_LABEL);
       }
     }
-    const bodyWithSig = args.body + buildAgentSignature(ctx);
+    const collaborators = resolveRequestedBy(ctx, args.requested_by);
+    const bodyWithSig = args.body + buildAgentSignature(ctx, collaborators);
     const result = await github.createIssue(args.repo, args.title, bodyWithSig, effectiveLabels);
     if (!result.ok) return errorResult(result.error ?? 'Failed to create issue');
     return textResult(`Issue created: ${result.issueUrl ?? 'success'}`);

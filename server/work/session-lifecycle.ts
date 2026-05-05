@@ -6,7 +6,13 @@ import { createSession } from '../db/sessions';
 import { clearWorktreeDir, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
 import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
-import { formatAgentSignature, formatCoAuthoredBy } from '../mcp/tool-handlers/github';
+import {
+  formatAgentSignature,
+  formatCoAuthoredBy,
+  formatHumanCoAuthoredBy,
+  type HumanCollaborator,
+  resolveCollaborator,
+} from '../mcp/tool-handlers/github';
 import type { ProcessManager } from '../process/manager';
 import { checkInternPrGuard } from './intern-guard';
 import { runValidation } from './validation';
@@ -211,6 +217,9 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
   const agent = task.agentId ? getAgent(db, task.agentId) : null;
   const coAuthor = formatCoAuthoredBy(agent);
 
+  // Resolve human collaborator from requester info
+  const collaborators = resolveCollaboratorsFromTask(db, task.requesterInfo);
+
   try {
     // Ensure origin remote exists — projects with persistent strategy may lack it (#1829)
     const hasOrigin = await ensureOriginRemote(db, task.projectId, cwd);
@@ -226,8 +235,11 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
       // There are uncommitted changes — commit them
       const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await addProc.exited;
-      const commitMsg = coAuthor
-        ? `Work task: ${task.description.slice(0, 60)}\n\n${coAuthor}`
+      const trailers = [coAuthor];
+      for (const c of collaborators) trailers.push(formatHumanCoAuthoredBy(c));
+      const trailerStr = trailers.filter(Boolean).join('\n');
+      const commitMsg = trailerStr
+        ? `Work task: ${task.description.slice(0, 60)}\n\n${trailerStr}`
         : `Work task: ${task.description.slice(0, 60)}`;
       const commitProc = Bun.spawn(['git', 'commit', '-m', commitMsg], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await commitProc.exited;
@@ -251,7 +263,7 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
     // Create PR via gh CLI
     const title = `[Agent] ${task.description.slice(0, 60)}`;
     const baseBody = `Automated work task.\n\n**Description:** ${task.description}\n\n**Summary:** ${sanitizeSessionSummary(sessionOutput, 300)}`;
-    const body = baseBody + formatAgentSignature(agent, taskId);
+    const body = baseBody + formatAgentSignature(agent, taskId, collaborators.length > 0 ? collaborators : undefined);
     log.info('Fallback: creating PR', { taskId, branch: task.branchName });
 
     const prProc = Bun.spawn(['gh', 'pr', 'create', '--title', title, '--body', body, '--head', task.branchName], {
@@ -317,6 +329,19 @@ export async function cleanupWorktree(db: Database, taskId: string): Promise<voi
 
   await removeWorktree(project.workingDir, task.worktreeDir);
   clearWorktreeDir(db, taskId);
+}
+
+function resolveCollaboratorsFromTask(db: Database, requesterInfo: Record<string, unknown>): HumanCollaborator[] {
+  const collaborators: HumanCollaborator[] = [];
+  if (typeof requesterInfo.discordUserId === 'string') {
+    const c = resolveCollaborator(db, 'discord', requesterInfo.discordUserId);
+    if (c) collaborators.push(c);
+  }
+  if (typeof requesterInfo.algochatAddress === 'string') {
+    const c = resolveCollaborator(db, 'algochat', requesterInfo.algochatAddress);
+    if (c) collaborators.push(c);
+  }
+  return collaborators;
 }
 
 /**
