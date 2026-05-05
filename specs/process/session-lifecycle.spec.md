@@ -42,6 +42,22 @@ The keep-alive TTL is managed by `SessionTimerManager` (not `SessionLifecycleMan
 2. Treating sessions with warm processes as "active" — protecting them from cleanup just like running sessions
 3. Coordinating with `ProcessManager.cleanupSessionState()` when a session with a warm process is force-cleaned
 
+### Session States
+
+Session state transitions and protection rules for lifecycle management:
+
+| State | Meaning | Cleanup Protection | Transition Rules |
+|-------|---------|-------------------|------------------|
+| `'running'` | Session active, model executing | TTL expiration + limit enforcement: **PROTECTED** | → `'idle'`, `'waiting'`, `'paused'` on user action / timeout |
+| `'waiting'` | Session paused, user input expected, optional warm process kept alive | TTL expiration + limit enforcement: **PROTECTED** | → `'idle'` on timeout (not deletion); → `'running'` on user input |
+| `'idle'` | Session complete, no activity | TTL expiration + limit enforcement: **NOT PROTECTED** (eligible for cleanup after 7 days) | → `'running'` on user resume; → deleted on TTL expiration |
+| `'paused'` | Session suspended by user | TTL expiration: **PROTECTED**; limit enforcement: eligible if older than 24 hours | → `'running'` on resume; → deleted on limit enforcement (24+ hr old only) |
+| `'completed'` | Session finished normally | TTL expiration + limit enforcement: **NOT PROTECTED** | → deleted on TTL expiration |
+| `'error'` | Session failed | TTL expiration + limit enforcement: **NOT PROTECTED** | → deleted on TTL expiration |
+| `'stopped'` | Session explicitly stopped | TTL expiration + limit enforcement: **NOT PROTECTED** | → deleted on TTL expiration |
+
+**Key difference**: `'waiting'` sessions remain protected from TTL expiration indefinitely (like `'running'`), even if 7+ days pass. They transition to `'idle'` on timeout, where TTL expiration then becomes eligible.
+
 ## Public API
 
 ### Exported Functions
@@ -82,7 +98,7 @@ The keep-alive TTL is managed by `SessionTimerManager` (not `SessionLifecycleMan
 
 ## Invariants
 
-1. Sessions in `'running'` status are never cleaned up by automated expiration or limit enforcement. Sessions in `'paused'` status are protected from TTL expiration but are subject to per-project limit enforcement if older than 24 hours. Sessions with warm processes (status may be `'idle'` in DB but with a live process in memory) are treated as effectively running and protected from all automated cleanup.
+1. Sessions in `'running'` OR `'waiting'` status are never cleaned up by automated expiration or limit enforcement. Sessions in `'paused'` status are protected from TTL expiration but are subject to per-project limit enforcement if older than 24 hours. Sessions with warm processes (status may be `'idle'` in DB but with a live process in memory) are treated as effectively running and protected from all automated cleanup.
 2. Session TTL expiration only applies to sessions in terminal states (`'idle'`, `'completed'`, `'error'`, `'stopped'`).
 3. Per-project session limit enforcement deletes the oldest non-`'running'` sessions first (including `'paused'`), but only those older than 24 hours. Sessions younger than 24 hours are protected from limit-based cleanup to prevent a burst of new sessions from evicting recently-created sessions that users still expect to be resumable.
 4. All session deletions cascade within a transaction: `algochat_conversations` FK nullified, `session_messages` deleted, `escalation_queue` entries deleted, then the session row itself.
@@ -90,7 +106,8 @@ The keep-alive TTL is managed by `SessionTimerManager` (not `SessionLifecycleMan
 6. Expired session cleanup is batched (up to 100 per cycle) to avoid blocking the event loop.
 7. `cleanupSession` is transactional: either all related data is deleted or none is.
 8. **Warm process protection**: Automated cleanup (TTL expiration + per-project limits) must check whether a session has a live warm process before deleting. A session with a warm process is never eligible for automated cleanup regardless of its DB status or age.
-9. **Keep-alive TTL delegation**: The keep-alive TTL timer is owned by `SessionTimerManager`, not `SessionLifecycleManager`. The lifecycle manager only needs to be aware of warm processes for protection during cleanup — it does not start, reset, or clear keep-alive timers.
+9. **Waiting state protected from TTL expiration**: Sessions in `'waiting'` status transition to `'idle'` on timeout, not deleted. They are protected from TTL expiration even if the timeout has elapsed (7+ days). The `'waiting'` state means the session is paused, user input is expected, and a warm process may optionally be kept alive. Like `'running'` sessions, `'waiting'` sessions are immune to automated cleanup.
+10. **Keep-alive TTL delegation**: The keep-alive TTL timer is owned by `SessionTimerManager`, not `SessionLifecycleManager`. The lifecycle manager only needs to be aware of warm processes for protection during cleanup — it does not start, reset, or clear keep-alive timers.
 
 ## Behavioral Examples
 
@@ -131,6 +148,13 @@ The keep-alive TTL is managed by `SessionTimerManager` (not `SessionLifecycleMan
 - **When** `cleanupSession("sess-123")` is called
 - **Then** all related data is deleted in a transaction and the method returns `true`
 
+### Scenario: Session waiting state protected from TTL expiration
+- **Given** session in `'waiting'` status created 9 days ago (past the 7-day TTL)
+- **When** periodic cleanup runs (7-day TTL expiration check)
+- **Then** the session is not expired or deleted; it remains in `'waiting'` status
+- **And** if a timeout occurs while in cleanup cycle, the session transitions to `'idle'` instead of deletion
+- **And** once in `'idle'` status, the session becomes eligible for TTL expiration on the next cleanup cycle
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -163,4 +187,4 @@ The keep-alive TTL is managed by `SessionTimerManager` (not `SessionLifecycleMan
 |------|--------|--------|
 | 2026-03-04 | corvid-agent | Initial spec |
 | 2026-03-18 | corvid-agent | v3: Removed protected-paths exports (now in dedicated `protected-paths.spec.md`). Added 24-hour minimum age guard to `enforceSessionLimits`. Fixes #1221 |
-| 2026-05-04 | corvid-agent | v2: Keep-alive TTL — TTL hierarchy (session vs process), warm process protection from cleanup, keepAliveTtlMs in config, warmProcessCount in stats (#2222, #2233) |
+| 2026-05-04 | corvid-agent | v3: Waiting state protection — clarified 'waiting' state (paused, user input expected, optional warm process), expanded Invariant 1 to include 'waiting' protection, added Invariant 9 (waiting → idle on timeout, not deletion), added Session States table with transitions and protection rules, behavioral scenario for waiting state TTL bypass (#2232, #2233) |

@@ -23,6 +23,55 @@ Uses a dependency-injection pattern (`ProcessSpawnerDeps`) so it can be tested a
 
 The process spawner is the **cold path only**. It is never called when the warm path succeeds — warm path delivery happens entirely within `ProcessManager.resumeProcess()` via `sendMessage()`.
 
+### Spawn Path Decision Tree
+
+When resuming a session with a user message:
+
+```
+Session resume requested
+  ↓
+  Is process alive? (isAlive() → true)
+    ├─ YES → WARM PATH: Call warmStartProcess(deps, sessionId, prompt, userPrompt?)
+    │           Returns: boolean (success → skip spawn, failure → fallback to cold path)
+    │           Mechanism: Verify process health, inject message via streamInput
+    │
+    └─ NO → COLD PATH: Call coldStartProcess(deps, session, project, agent, prompt, options?)
+              Mechanism: Full process reconstruction, new session config, new process instance
+```
+
+### Warm-Start Path
+
+**Warm-start** resumes an existing, live SDK process with a new message (user prompt). Prerequisites:
+- Process must exist in the `processes` map
+- `isAlive()` must return `true` (process not crashed or terminated)
+- Do NOT reconstruct the process or session config
+
+**Mechanism**:
+1. Verify process is still alive (check process handle, no IO errors)
+2. Call `sendMessage(sessionId, userPrompt)` to inject the next message via the process's input stream
+3. Return `true` on success; on failure, return `false` to trigger cold-path fallback
+
+**Benefits**:
+- Reuses model context and session state
+- Keeps warm processes alive across multiple turns
+- No session reconstruction overhead
+
+### Cold-Start Path
+
+**Cold-start** fully reconstructs a session and process from scratch. Used when:
+- No process exists in the `processes` map
+- Process exists but `isAlive()` returns `false` (crashed or terminated)
+- Warm-start `sendMessage()` returned `false` (delivery failed)
+
+**Mechanism**:
+1. Resolve session config (persona, skills, tools)
+2. Build MCP context
+3. Assemble full process spawn parameters
+4. Call `startSdkProcess()` or `startDirectProcess()` for fresh process creation
+5. Register the new process and write session PID/status to DB
+
+**Key difference from warm-start**: Full reconstruction means new session config, new MCP context, new process instance — no state reuse.
+
 ### Warm Path Guard
 
 Before calling any spawner function, the `ProcessManager` checks whether a live warm process already exists for the session. The spawner functions are only reached when:
@@ -50,6 +99,8 @@ This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and 
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
+| `warmStartProcess` | `(deps, sessionId, prompt, userPrompt?)` | `boolean` | Resume a live process with new message. Verifies process is alive, calls `sendMessage` to inject the next message. Returns `true` on success; on failure, returns `false` to signal warm-path fallback to cold-start. Never reconstructs the process or session config. |
+| `coldStartProcess` | `(deps, session, project, agent, prompt, options?)` | `void` | Spawn a new process from scratch. Resolves session config, builds MCP context, calls spawner functions (`spawnSdkProcess` or `spawnDirectProcess`), registers process, writes PID/status to DB. May throw on fatal errors. |
 | `registerSpawnedProcess` | `(deps, session, sp)` | `void` | Final step after spawn: clears starting guard, registers process, inits metadata, writes PID/status to DB, starts timers, emits `session_started` |
 | `spawnSdkProcess` | `(deps, session, project, agent, prompt, options?)` | `void` | Start an SDK (Claude Code) process: resolves session config, builds MCP context, delegates to `startSdkProcess`, registers on success |
 | `spawnDirectProcess` | `(deps, session, project, agent, prompt, provider, options?)` | `void` | Start a direct (Ollama) process: resolves session config, builds MCP context, delegates to `startDirectProcess`, registers on success |
@@ -65,8 +116,9 @@ This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and 
 4. **Spawn errors emit both `error` and `session_error`**: Failed spawns emit a generic `error` event and a structured `session_error` event with `severity: fatal, recoverable: false`
 5. **Ephemeral dir tracked per session**: Ephemeral directories are stored in the `ephemeralDirs` map keyed by session ID and cleaned up via `releaseEphemeralDir`
 6. **Provider routing**: Direct-mode providers use `spawnDirectProcess`; SDK-mode (or Ollama with proxy enabled) uses `spawnSdkProcess`
-7. **Cold-path-only execution**: All spawner functions assume no warm process exists for the target session. The warm path guard in `ProcessManager.resumeProcess()` ensures spawner functions are only called when the warm path is unavailable or has failed
-8. **keepAlive pass-through**: When `SpawnOptions.keepAlive` is `true`, it is forwarded to `startSdkProcess()` via `SdkProcessOptions.keepAlive`. The spawner does not interpret or manage this flag — it merely passes it through
+7. **Cold-path-only execution**: All spawner functions assume no warm process exists for the target session. The warm path guard in `ProcessManager.resumeProcess()` ensures spawner functions are only called when the warm path is unavailable or has failed. `warmStartProcess` is the only function that checks for live processes; all others assume the process is dead or nonexistent.
+8. **No warm-path retry**: If `warmStartProcess` returns `false`, the decision is final — immediately invoke `coldStartProcess`. Do NOT retry warm-start or attempt alternative warm paths. Cold-start is the fallback.
+9. **keepAlive pass-through**: When `SpawnOptions.keepAlive` is `true`, it is forwarded to `startSdkProcess()` via `SdkProcessOptions.keepAlive`. The spawner does not interpret or manage this flag — it merely passes it through
 
 ## Behavioral Examples
 
@@ -94,19 +146,44 @@ This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and 
 - **When** `spawnSdkProcess` is called (after warm path guard confirmed no warm process)
 - **Then** `startSdkProcess` is called with `keepAlive: true` in its options, and the resulting process will enter warm state after its first model turn instead of exiting
 
-### Scenario: Spawner not called when warm process exists
+### Scenario: Warm-start resumes live process
+
+- **Given** a session with a live warm SDK process (`isAlive() = true`)
+- **When** `warmStartProcess` is called with a new user prompt
+- **Then** the process health is verified, `sendMessage()` injects the new message, and `true` is returned; no process reconstruction occurs
+- **And** the spawner functions are NOT invoked
+
+### Scenario: Warm-start failure triggers cold-start
+
+- **Given** a session with a live warm process, but the process handle is stale
+- **When** `warmStartProcess` is called
+- **Then** `isAlive()` returns `false`, `warmStartProcess` returns `false`
+- **And** `coldStartProcess` is immediately invoked to fully reconstruct the process
+- **And** no retry of warm-start is attempted
+
+### Scenario: Spawner not called when warm process succeeds
 
 - **Given** a session with a live warm SDK process (`isAlive() = true`)
 - **When** `resumeProcess` is called on the `ProcessManager`
-- **Then** the warm path delivers via `sendMessage()` and no spawner function is invoked
+- **Then** `warmStartProcess` is called and returns `true`, and no cold-path spawner function is invoked
 
 ## Error Cases
 
+### Warm-Start Failure Behavior
+
 | Condition | Behavior |
 |-----------|----------|
-| SDK process spawn throws | Session status set to `error`, `error` + `session_error` events emitted, function returns without registering |
+| `warmStartProcess` returns `false` | Immediately triggers cold-start fallback via `coldStartProcess`. Do NOT retry warm path — first failure commits to cold path. |
+| Process handle is stale (isAlive checks fail) | `warmStartProcess` returns `false`; cold-start is invoked to reconstruct. |
+
+### Spawn Error Handling
+
+| Condition | Behavior |
+|-----------|----------|
+| SDK process spawn throws | Session status set to `error`, `error` + `session_error` events emitted, function returns without registering. Starting guard cleared. |
 | Direct process spawn throws | Same as SDK spawn failure |
 | Directory resolution fails | Starting guard cleared, `error` event emitted with `dir_resolution_error` type |
+| `coldStartProcess` throws | Fatal error; starting guard cleared, `error` + `session_error` events emitted with `severity: fatal, recoverable: false` |
 
 ## Dependencies
 
@@ -136,4 +213,4 @@ This means `spawnSdkProcess`, `spawnDirectProcess`, `startWithResolvedDir`, and 
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-04-16 | Jackdaw | Initial extraction from manager.ts |
-| 2026-05-04 | corvid-agent | v2: Keep-alive integration — warm path guard, keepAlive pass-through in SpawnOptions, cold-path-only invariant (#2222, #2232) |
+| 2026-05-04 | corvid-agent | v2: Keep-alive integration — warm-start path (streamInput delivery), cold-start path (full reconstruction), spawn error handling, warmStartProcess & coldStartProcess function stubs, no-retry fallback rule, decision tree (#2222, #2232) |
