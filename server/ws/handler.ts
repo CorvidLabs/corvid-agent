@@ -152,13 +152,7 @@ export function createWebSocketHandler(
       const effectiveCaps = service.intersectCapabilities(clientCaps);
 
       data.authenticated = true;
-      service.registerSession(
-        data.sessionId,
-        label,
-        projectId,
-        effectiveCaps,
-        ws,
-      );
+      service.registerSession(data.sessionId, label, projectId, effectiveCaps, ws);
       ws.send(JSON.stringify({ type: 'auth_ok', sessionId: data.sessionId }));
       return;
     }

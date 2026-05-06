@@ -1,10 +1,7 @@
 import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
 
-export async function handleBridgeListSessions(
-  ctx: McpToolContext,
-  _args: Record<string, never>,
-) {
+export async function handleBridgeListSessions(ctx: McpToolContext, _args: Record<string, never>) {
   const bridgeService = ctx.bridgeService;
   if (!bridgeService) return errorResult('Bridge service not available');
   const sessions = bridgeService.listSessions();
