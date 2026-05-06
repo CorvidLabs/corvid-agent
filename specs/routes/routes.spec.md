@@ -36,6 +36,7 @@ files:
   - server/routes/slack.ts
   - server/routes/tenants.ts
   - server/routes/usage.ts
+  - server/routes/bridge.ts
   - server/routes/bridge-delivery.ts
   - server/routes/dashboard.ts
   - server/routes/feedback.ts
@@ -127,6 +128,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSlackRoutes` | slack.ts | Slack events API handler |
 | `handleTenantRoutes` | tenants.ts | Tenant registration and members |
 | `handleUsageRoutes` | usage.ts | Usage summaries and anomalies |
+| `handleDevBridgeRoutes` | bridge.ts | Bridge session listing and lookup |
 | `handleBridgeDeliveryRoutes` | bridge-delivery.ts | Bridge delivery receipt metrics |
 | `handleDashboardRoutes` | dashboard.ts | Dashboard summary aggregation |
 | `handleFeedbackRoutes` | feedback.ts | PR outcome tracking and analysis |
@@ -243,6 +245,7 @@ Each route module exports a handler function with the signature `(req, url, db, 
 | `handleSlackRoutes` | Slack events API handler |
 | `handleTenantRoutes` | Tenant registration and members |
 | `handleUsageRoutes` | Usage summaries and anomalies |
+| `handleDevBridgeRoutes` | Bridge session listing and lookup |
 | `handleBridgeDeliveryRoutes` | Bridge delivery receipt metrics |
 | `handleDashboardRoutes` | Dashboard summary aggregation |
 | `handleFeedbackRoutes` | PR outcome tracking and analysis |
@@ -599,6 +602,13 @@ Every request passes through these stages in order:
 | POST | `/api/exam/run` | exam.ts | Run live model exam |
 | GET | `/api/exam/categories` | exam.ts | List exam categories |
 
+### Bridge
+
+| Method | Path | Handler | Description |
+|--------|------|---------|-------------|
+| GET | `/api/bridge/sessions` | bridge.ts | List all active bridge sessions |
+| GET | `/api/bridge/sessions/:id` | bridge.ts | Get a specific bridge session by ID |
+
 ### Bridge Delivery
 
 | Method | Path | Handler | Description |
@@ -896,3 +906,4 @@ Every request passes through these stages in order:
 | 2026-03-08 | corvid-agent | Documented council re-exports: `HEARTBEAT_INTERVAL_MS`, `SAFETY_TIMEOUT_MS`, `WaitForSessionsOptions` |
 | 2026-03-13 | corvid-agent | Added 11 route modules for 100% spec coverage |
 | 2026-03-20 | corvid-agent | Added `discord-image.ts` route module (`handleDiscordImageRoutes`) |
+| 2026-05-06 | corvid-agent | Added `bridge.ts` route module (`handleDevBridgeRoutes`) (#2287) |

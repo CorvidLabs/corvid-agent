@@ -4,7 +4,7 @@ import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { clearWorktreeDir, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
-import { applyPrLabels, inferPrLabels } from '../github/operations';
+import { labelPrIfAllowed } from '../github/operations';
 import { formatPrBody } from '../github/pr-body';
 import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
@@ -228,16 +228,31 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
       return null;
     }
 
-    // Ensure all changes are committed (agent may have left unstaged changes)
-    const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+    // Ensure all changes are committed (agent may have left unstaged/untracked changes)
+    // Use `git status --porcelain` which detects ALL pending changes:
+    // untracked files, staged changes, and unstaged modifications.
+    const statusProc = Bun.spawn(['git', 'status', '--porcelain'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+    const statusOutput = await new Response(statusProc.stdout).text();
     await statusProc.exited;
-    if ((await statusProc.exited) !== 0) {
-      // There are uncommitted changes — commit them
+    if (statusOutput.trim().length > 0) {
       const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await addProc.exited;
       const commitMsg = formatCommitMessage(task.description, task.branchName ?? '', agent, collaborators);
       const commitProc = Bun.spawn(['git', 'commit', '-m', commitMsg], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await commitProc.exited;
+    }
+
+    // Verify the branch has commits to push (avoid empty PRs)
+    const logProc = Bun.spawn(['git', 'log', '--oneline', 'HEAD', '--not', '--remotes=origin'], {
+      cwd,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const logOutput = await new Response(logProc.stdout).text();
+    await logProc.exited;
+    if (logOutput.trim().length === 0) {
+      log.warn('Fallback: branch has no commits ahead of remote — nothing to push', { taskId });
+      return null;
     }
 
     // Push the branch
@@ -287,17 +302,11 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
         const repoMatch = prUrl.match(/github\.com\/([^/]+\/[^/]+)\/pull\/\d+/);
         const repo = repoMatch?.[1];
         if (repo) {
-          const labels = inferPrLabels(title, agent?.name ?? undefined);
-          const owner = repo.split('/')[0] ?? '';
           const allowedOrgs = (process.env.GITHUB_ALLOWED_ORGS ?? '')
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean);
-          const isLabelable =
-            allowedOrgs.length > 0 ? allowedOrgs.includes(owner) : owner.toLowerCase() === 'corvidlabs';
-          if (labels.length > 0 && isLabelable) {
-            await applyPrLabels(repo, prUrl, labels);
-          }
+          await labelPrIfAllowed(repo, prUrl, title, agent?.name ?? undefined, allowedOrgs);
         }
       } catch {
         // Label failure must not block PR creation

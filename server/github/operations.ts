@@ -658,3 +658,27 @@ export async function applyPrLabels(repo: string, prUrl: string, labels: string[
     // ignore — labeling failure must not block PR creation
   }
 }
+
+export function isOrgLabelable(owner: string, allowedOrgs?: ReadonlySet<string> | string[]): boolean {
+  if (!owner) return false;
+  if (allowedOrgs) {
+    if (allowedOrgs instanceof Set) return allowedOrgs.size > 0 && allowedOrgs.has(owner);
+    if (Array.isArray(allowedOrgs)) return allowedOrgs.length > 0 && allowedOrgs.includes(owner);
+  }
+  return owner.toLowerCase() === 'corvidlabs';
+}
+
+export async function labelPrIfAllowed(
+  repo: string,
+  prUrl: string,
+  title: string,
+  agentName?: string,
+  allowedOrgs?: ReadonlySet<string> | string[],
+): Promise<void> {
+  const owner = repo.split('/')[0] ?? '';
+  if (!isOrgLabelable(owner, allowedOrgs)) return;
+  const labels = inferPrLabels(title, agentName);
+  if (labels.length > 0) {
+    await applyPrLabels(repo, prUrl, labels);
+  }
+}

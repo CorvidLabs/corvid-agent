@@ -37,6 +37,27 @@ skills/          — AI agent skills (29 skill files)
 - **Frontend:** Angular (standalone components, signals)
 - **Blockchain:** Algorand (AlgoChat, wallets)
 - **Voice:** OpenAI TTS (tts-1) and Whisper (STT)
+- **Dev CLI:** [fledge](https://crates.io/crates/fledge) — dev-lifecycle CLI (`~/.cargo/bin/fledge`, config in `fledge.toml`)
+
+## Tooling — fledge First
+
+**Always prefer `fledge` over raw tool invocations.** fledge is our primary dev-lifecycle CLI. Only fall back to raw `bun`/`git`/`npm` commands when fledge doesn't cover the operation.
+
+| Task | fledge command | Raw fallback |
+|------|---------------|--------------|
+| Full verify | `fledge lanes run verify` | `bun run lint && bun x tsc ... && bun test && bun run spec:check` |
+| Quick check | `fledge lanes run check` | `bun run lint && bun x tsc ...` |
+| Auto-fix | `fledge lanes run fix` | `bun run lint:fix && bun run format:fix` |
+| Security audit | `fledge lanes run audit` | manual multi-step |
+| Cut a release | `fledge release` | manual version bump + tag + changelog |
+| Start branch | `fledge work start <name>` | `git checkout -b <name>` |
+| Commit | `fledge work commit` | `git add && git commit` |
+| Push | `fledge work push` | `git push` |
+| Spec check | `fledge spec check` | `bun run spec:check` |
+| Code review | `fledge review` | manual |
+| Run any task | `fledge run <task>` | see `fledge.toml [tasks]` |
+
+fledge supports plugins (`fledge plugins install/search`) for extending capabilities beyond built-in commands.
 
 ## Algorand Network Topology
 

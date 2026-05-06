@@ -65,6 +65,8 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | `inferPrLabels` | `title: string, agentName?: string` | `string[]` | Returns GitHub label names inferred from a PR title (conventional commit prefix → type label) plus an optional agent label |
 | `ensureLabelExists` | `repo: string, name: string, color: string` | `Promise<void>` | Creates a label on a repo if it doesn't exist; 422 conflicts are silently ignored |
 | `applyPrLabels` | `repo: string, prUrl: string, labels: string[]` | `Promise<void>` | Ensures labels exist and applies them to the PR identified by URL; fails silently on all errors |
+| `isOrgLabelable` | `owner: string, allowedOrgs?: ReadonlySet<string> \| string[]` | `boolean` | Returns true if the org is in the allowed set/array, or defaults to `corvidlabs` when no allowedOrgs provided |
+| `labelPrIfAllowed` | `repo: string, prUrl: string, title: string, agentName?: string, allowedOrgs?: ReadonlySet<string> \| string[]` | `Promise<void>` | Checks if repo org is labelable, infers labels, and applies them; used by both MCP handler and work-task fallback |
 
 ### Exported Types
 
@@ -85,7 +87,7 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 7. `findSimilarIssues` uses Jaccard similarity with configurable threshold (default 0.5) and filters stop words from title comparisons.
 8. `createIssueWithDedup` returns the existing issue URL with `deduplicated: true` if a similar issue is found, instead of creating a duplicate.
 9. All `gh` CLI calls use `buildSafeGhEnv()` to construct a sanitized environment.
-10. `applyPrLabels` only operates on repos whose org matches `GITHUB_ALLOWED_ORGS` (if set) or defaults to the `corvidlabs` org.
+10. `labelPrIfAllowed` checks the repo org via `isOrgLabelable` against `GITHUB_ALLOWED_ORGS` (if set) or defaults to the `corvidlabs` org.
 11. `applyPrLabels` fails silently on all errors — PR creation is never blocked by label operations.
 12. `inferPrLabels` maps conventional commit prefixes (feat, fix, chore, docs, refactor, test, perf, ci, build) to `type:*` labels and appends an `agent:*` label when `agentName` is provided.
 
