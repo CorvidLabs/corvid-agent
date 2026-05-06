@@ -1,4 +1,33 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+
+// Override mock.module leak from github-tool-handlers.test.ts which replaces
+// labelPrIfAllowed with a no-op. Bun 1.x mock.module merges: only exports we
+// provide here are overridden; the rest (applyPrLabels, inferPrLabels, etc.)
+// fall through to the real module.
+mock.module('../github/operations', () => ({
+  isOrgLabelable: (owner: string, allowedOrgs?: ReadonlySet<string> | string[]): boolean => {
+    if (!owner) return false;
+    if (allowedOrgs) {
+      if (allowedOrgs instanceof Set) return allowedOrgs.size > 0 && allowedOrgs.has(owner);
+      if (Array.isArray(allowedOrgs)) return allowedOrgs.length > 0 && allowedOrgs.includes(owner);
+    }
+    return owner.toLowerCase() === 'corvidlabs';
+  },
+  labelPrIfAllowed: async (
+    repo: string,
+    prUrl: string,
+    title: string,
+    agentName?: string,
+    allowedOrgs?: ReadonlySet<string> | string[],
+  ): Promise<void> => {
+    const ops = require('../github/operations');
+    const owner = repo.split('/')[0] ?? '';
+    if (!ops.isOrgLabelable(owner, allowedOrgs)) return;
+    const labels = ops.inferPrLabels(title, agentName);
+    if (labels.length > 0) await ops.applyPrLabels(repo, prUrl, labels);
+  },
+}));
+
 import {
   applyPrLabels,
   ensureLabelExists,
