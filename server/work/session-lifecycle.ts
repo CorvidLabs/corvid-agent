@@ -9,8 +9,7 @@ import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
 import {
   formatAgentSignature,
-  formatCoAuthoredBy,
-  formatHumanCoAuthoredBy,
+  formatCommitMessage,
   type HumanCollaborator,
   resolveCollaborator,
 } from '../mcp/tool-handlers/github';
@@ -214,9 +213,8 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
 
   const cwd = task.worktreeDir;
 
-  // Resolve agent info for commit trailer and PR signature (#1576)
+  // Resolve agent info for commit message and PR signature (#1576, #2274)
   const agent = task.agentId ? getAgent(db, task.agentId) : null;
-  const coAuthor = formatCoAuthoredBy(agent);
 
   // Resolve human collaborator from requester info
   const collaborators = resolveCollaboratorsFromTask(db, task.requesterInfo);
@@ -236,12 +234,7 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
       // There are uncommitted changes — commit them
       const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await addProc.exited;
-      const trailers = [coAuthor];
-      for (const c of collaborators) trailers.push(formatHumanCoAuthoredBy(c));
-      const trailerStr = trailers.filter(Boolean).join('\n');
-      const commitMsg = trailerStr
-        ? `Work task: ${task.description.slice(0, 60)}\n\n${trailerStr}`
-        : `Work task: ${task.description.slice(0, 60)}`;
+      const commitMsg = formatCommitMessage(task.description, task.branchName ?? '', agent, collaborators);
       const commitProc = Bun.spawn(['git', 'commit', '-m', commitMsg], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await commitProc.exited;
     }
