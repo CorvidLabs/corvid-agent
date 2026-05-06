@@ -155,6 +155,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleLibraryListOnChain` | `(ctx, { category?, tag?, limit? })` | `Promise<CallToolResult>` | List all on-chain CRVLIB entries — reads blockchain directly via indexer |
 | `handleLibraryDelete` | `(ctx, { key, mode? })` | `Promise<CallToolResult>` | Delete a shared library entry. Mode is 'soft' (default, archived) or 'hard' (destroyed) |
 | `handleRestartServer` | `(ctx, { reason? })` | `Promise<CallToolResult>` | Safe, idempotent server restart. First call sets `server_restart_initiated_at` and exits with code 75. Post-restart call clears the flag and confirms success |
+| `handleBridgeListSessions` | `(ctx, {})` | `Promise<CallToolResult>` | List active bridge sessions with connection info |
+| `handleBridgeRequest` | `(ctx, { session_id, request_type, path?, content?, command?, cwd? })` | `Promise<CallToolResult>` | Send a typed request to a connected bridge session |
 
 ## Invariants
 
@@ -239,6 +241,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `server/discord/embeds.ts` | `sendDiscordMessage`, `sendMessageWithFiles` |
 | `server/lib/delivery-tracker.ts` | `getDeliveryTracker` |
 | `server/db/observations.ts` | `recordObservation`, `listObservations`, `searchObservations`, `boostObservation`, `dismissObservation`, `countObservations` |
+| `server/bridge/service.ts` | `BridgeService.listSessions()`, `BridgeService.sendRequest()` |
 
 ### Consumed By
 
@@ -272,3 +275,4 @@ Internal constants (not env-configurable):
 | 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |
 | 2026-04-13 | corvid-agent | Added cross-channel-guard.ts: runtime enforcement for TODO(#1067), advisory logging for channel-bound sessions |
 | 2026-05-01 | corvid-agent | Documented handleEscalateWorkTask export from work.ts (#2215) |
+| 2026-05-06 | corvid-agent | Added bridge tool handlers: handleBridgeListSessions, handleBridgeRequest (#2287) |
