@@ -2,10 +2,10 @@ import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
 
 export async function handleBridgeListSessions(
-  _ctx: McpToolContext,
+  ctx: McpToolContext,
   _args: Record<string, never>,
 ) {
-  const bridgeService = _ctx.bridgeService;
+  const bridgeService = ctx.bridgeService;
   if (!bridgeService) return errorResult('Bridge service not available');
   const sessions = bridgeService.listSessions();
   if (sessions.length === 0) return textResult('No active bridge sessions.');
@@ -17,10 +17,10 @@ export async function handleBridgeListSessions(
 }
 
 export async function handleBridgeRequest(
-  _ctx: McpToolContext,
+  ctx: McpToolContext,
   args: { session_id: string; request_type: string; path?: string; content?: string; command?: string; cwd?: string },
 ) {
-  const bridgeService = _ctx.bridgeService;
+  const bridgeService = ctx.bridgeService;
   if (!bridgeService) return errorResult('Bridge service not available');
 
   const requestId = crypto.randomUUID();

@@ -104,6 +104,19 @@ export class BridgeService {
     pending.resolve(response);
   }
 
+  intersectCapabilities(clientCaps: BridgeCapabilities): BridgeCapabilities {
+    const serverMax = {
+      read: process.env.BRIDGE_ALLOW_READ !== 'false',
+      write: process.env.BRIDGE_ALLOW_WRITE === 'true',
+      exec: process.env.BRIDGE_ALLOW_EXEC === 'true',
+    };
+    return {
+      read: clientCaps.read && serverMax.read,
+      write: clientCaps.write && serverMax.write,
+      exec: clientCaps.exec && serverMax.exec,
+    };
+  }
+
   private validateCapability(session: BridgeSession, request: BridgeRequest): void {
     const { capabilities } = session;
 

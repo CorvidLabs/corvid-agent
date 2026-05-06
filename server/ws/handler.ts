@@ -148,12 +148,15 @@ export function createWebSocketHandler(
       const label = typeof parsed.label === 'string' ? parsed.label.slice(0, MAX_LABEL_LENGTH) : 'unnamed';
       const projectId = typeof parsed.projectId === 'string' ? parsed.projectId.slice(0, MAX_LABEL_LENGTH) : '';
 
+      const clientCaps = parsed.capabilities ?? { read: true, write: false, exec: false };
+      const effectiveCaps = service.intersectCapabilities(clientCaps);
+
       data.authenticated = true;
       service.registerSession(
         data.sessionId,
         label,
         projectId,
-        { read: true, write: false, exec: false },
+        effectiveCaps,
         ws,
       );
       ws.send(JSON.stringify({ type: 'auth_ok', sessionId: data.sessionId }));

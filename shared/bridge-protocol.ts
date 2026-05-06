@@ -19,12 +19,11 @@ export interface BridgeRequest {
   content?: string;
   command?: string;
   cwd?: string;
-  timeout?: number;
 }
 
 export interface BridgeResponse {
   id: string;
-  type: string;
+  type: 'file.read' | 'file.write' | 'file.list' | 'exec' | 'ping';
   success: boolean;
   data?: unknown;
   error?: string;
