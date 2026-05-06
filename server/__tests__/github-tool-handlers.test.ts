@@ -79,6 +79,9 @@ mock.module('../github/operations', () => ({
         docs: 'type:docs',
         refactor: 'type:refactor',
         test: 'type:test',
+        perf: 'type:perf',
+        ci: 'type:ci',
+        build: 'type:build',
       };
       const label = map[match[1].toLowerCase()];
       if (label) labels.push(label);
