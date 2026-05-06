@@ -201,23 +201,6 @@ describe('applyPrLabels', () => {
   beforeEach(() => {
     process.env.GH_TOKEN = 'test-token';
     spawnSpy.mockClear();
-    spawnSpy.mockImplementation(
-      () =>
-        ({
-          stdout: new ReadableStream({
-            start(c) {
-              c.enqueue(new TextEncoder().encode(''));
-              c.close();
-            },
-          }),
-          stderr: new ReadableStream({
-            start(c) {
-              c.close();
-            },
-          }),
-          exited: Promise.resolve(0),
-        }) as ReturnType<typeof Bun.spawn>,
-    );
   });
 
   afterEach(() => {
