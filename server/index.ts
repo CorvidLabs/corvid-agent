@@ -329,6 +329,14 @@ const server = Bun.serve<WsData>({
 
     // Bridge WebSocket upgrade (developer environment bridge)
     if (url.pathname === '/api/bridge/ws') {
+      const bridgePreAuth = checkWsAuth(req, url, authConfig);
+      if (authConfig.apiKey && !bridgePreAuth) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+        });
+      }
+
       const sessionId = crypto.randomUUID();
       const upgraded = server.upgrade(rawReq, {
         data: {

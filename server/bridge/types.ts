@@ -20,6 +20,7 @@ export interface BridgeWsData {
   type: 'bridge';
   sessionId: string;
   authenticated: boolean;
+  authTimeoutTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 export type { BridgeCapabilities, BridgeRequest, BridgeResponse, BridgeSessionInfo };
