@@ -77,7 +77,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 - **Given** a completed session with no PR URL in the output
 - **When** `createPrFallback` is called
 - **Then** it ensures an `origin` remote exists (adding one from the project's `gitUrl` if missing)
-- **And** commits any unstaged changes, pushes the branch, and runs `gh pr create`
+- **And** commits any uncommitted changes (untracked, staged, or modified), pushes the branch, and runs `gh pr create`
 - **And** returns the PR URL on success or `null` on failure
 
 ### Scenario: Fallback PR creation with missing origin remote
@@ -96,6 +96,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 | PR URL not in output and fallback fails | Task marked `failed` with descriptive error |
 | `createPrFallback` with no branch or worktree | Returns `null` immediately |
 | No origin remote and no project `gitUrl` | Logs warning, returns `null` |
+| Branch has no commits ahead of remote | Logs warning, returns `null` (avoids empty PRs) |
 | Git push fails during fallback | Logs warning, returns `null` |
 | `gh pr create` fails during fallback | Logs warning, returns `null` |
 
@@ -124,6 +125,7 @@ Handles the post-session lifecycle for work tasks: validates output, iterates on
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-05-05 | corvid-agent | Fix fallback PR creation: use `git status --porcelain` (not `git diff --quiet`) to detect all uncommitted changes; add commits-ahead check before push (#2282) |
 | 2026-05-01 | corvid-agent | Mark tasks `escalation_needed` at iteration cap instead of `failed`; notify with actionable instructions (#2209) |
 | 2026-04-28 | corvid-agent | Add `notifyOwner` to `SessionLifecycleContext`; notify on iteration-cap failure (#2165) |
 | 2026-03-23 | corvid-agent | Initial spec — extracted from work-task-service.spec.md |
