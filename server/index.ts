@@ -45,7 +45,7 @@ import { handleOllamaRoutes } from './routes/ollama';
 import { handlePermissionRoutes } from './routes/permissions';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
-import { createWebSocketHandler } from './ws/handler';
+import { createWebSocketHandler, type WsData } from './ws/handler';
 
 const log = createLogger('Server');
 
@@ -185,17 +185,6 @@ const wsHandler = createWebSocketHandler(
   () => db,
   bridgeService,
 );
-
-interface WsData {
-  type?: 'bridge';
-  sessionId?: string;
-  subscriptions: Map<string, unknown>;
-  walletAddress?: string;
-  authenticated: boolean;
-  tenantId?: string;
-  type?: string;
-  sessionId?: string;
-}
 
 /**
  * Check admin authentication for sensitive internal endpoints (/metrics, /api/audit-log).
@@ -347,7 +336,6 @@ const server = Bun.serve<WsData>({
           subscriptions: new Map(),
           type: 'bridge' as const,
           sessionId,
-          subscriptions: new Map(),
           authenticated: false,
         },
       });
