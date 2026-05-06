@@ -4,6 +4,8 @@ import type { ClientMessage, ServerMessage, StreamEvent } from '../../shared/ws-
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AlgoChatBridge } from '../algochat/bridge';
+import type { BridgeService } from '../bridge/service';
+import type { BridgeWsData } from '../bridge/types';
 import { getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import type { AuthConfig } from '../middleware/auth';
@@ -40,6 +42,8 @@ export interface WsData {
   authTimeoutTimer?: ReturnType<typeof setTimeout> | null;
   /** Track work-task completion callbacks so they can be removed on disconnect. */
   workTaskCallbacks?: Map<string, (task: import('../../shared/types').WorkTask) => void>;
+  type?: string;
+  sessionId?: string;
 }
 
 /**
@@ -104,9 +108,77 @@ export function createWebSocketHandler(
   getSchedulerService?: () => SchedulerService | null,
   getOwnerQuestionManager?: () => OwnerQuestionManager | null,
   getDb?: () => Database,
+  bridgeService?: BridgeService,
 ) {
+  /** Max length for client-provided strings to prevent abuse. */
+  const MAX_LABEL_LENGTH = 256;
+
+  function handleBridgeMessage(
+    ws: ServerWebSocket<BridgeWsData>,
+    message: string | Buffer,
+    service: BridgeService,
+  ): void {
+    const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      ws.send(JSON.stringify({ error: 'Invalid JSON' }));
+      return;
+    }
+
+    const data = ws.data;
+
+    if (!data.authenticated) {
+      if (parsed.type !== 'auth' || !parsed.token) {
+        ws.send(JSON.stringify({ error: 'First message must be auth' }));
+        ws.close(1008, 'Auth required');
+        return;
+      }
+
+      if (authConfig.apiKey && !timingSafeEqual(parsed.token, authConfig.apiKey)) {
+        ws.send(JSON.stringify({ error: 'Invalid token' }));
+        ws.close(4001, 'Invalid token');
+        return;
+      }
+
+      if (data.authTimeoutTimer) {
+        clearTimeout(data.authTimeoutTimer);
+        data.authTimeoutTimer = null;
+      }
+
+      const label = typeof parsed.label === 'string' ? parsed.label.slice(0, MAX_LABEL_LENGTH) : 'unnamed';
+      const projectId = typeof parsed.projectId === 'string' ? parsed.projectId.slice(0, MAX_LABEL_LENGTH) : '';
+
+      const clientCaps = parsed.capabilities ?? { read: true, write: false, exec: false };
+      const effectiveCaps = service.intersectCapabilities(clientCaps);
+
+      data.authenticated = true;
+      service.registerSession(data.sessionId, label, projectId, effectiveCaps, ws);
+      ws.send(JSON.stringify({ type: 'auth_ok', sessionId: data.sessionId }));
+      return;
+    }
+
+    if (parsed.id && parsed.type && typeof parsed.success === 'boolean') {
+      service.handleResponse(data.sessionId, parsed);
+    }
+  }
+
   return {
     open(ws: ServerWebSocket<WsData>) {
+      if ((ws.data as any).type === 'bridge') {
+        const bridgeData = ws.data as unknown as BridgeWsData;
+        bridgeData.authTimeoutTimer = setTimeout(() => {
+          log.warn(`Bridge auth timeout — closing unauthenticated connection: ${bridgeData.sessionId}`);
+          try {
+            ws.close(4001, 'Authentication timeout');
+          } catch {
+            /* already closed */
+          }
+        }, AUTH_TIMEOUT_MS);
+        log.info(`Bridge WebSocket opened: ${bridgeData.sessionId}`);
+        return;
+      }
       // authenticated flag is set during upgrade in index.ts
       const isAuthenticated = ws.data?.authenticated ?? false;
       const tid = ws.data?.tenantId;
@@ -137,6 +209,14 @@ export function createWebSocketHandler(
     },
 
     message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
+      if ((ws.data as any).type === 'bridge') {
+        if (!bridgeService) {
+          ws.close(1011, 'Bridge service unavailable');
+          return;
+        }
+        handleBridgeMessage(ws as any, message, bridgeService);
+        return;
+      }
       const raw = typeof message === 'string' ? message : message.toString();
       log.debug('WS message received', { raw: raw.slice(0, 200) });
 
@@ -212,6 +292,15 @@ export function createWebSocketHandler(
     },
 
     close(ws: ServerWebSocket<WsData>) {
+      if ((ws.data as any)?.type === 'bridge') {
+        const bridgeData = ws.data as unknown as BridgeWsData;
+        if (bridgeData.authTimeoutTimer) {
+          clearTimeout(bridgeData.authTimeoutTimer);
+          bridgeData.authTimeoutTimer = null;
+        }
+        bridgeService?.removeSession(bridgeData.sessionId);
+        return;
+      }
       // Stop all timers
       stopHeartbeat(ws);
       clearAuthTimeout(ws);

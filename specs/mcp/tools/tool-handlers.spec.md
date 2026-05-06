@@ -30,6 +30,7 @@ files:
   - server/mcp/tool-handlers/discord.ts
   - server/mcp/tool-handlers/library.ts
   - server/mcp/tool-handlers/server-ops.ts
+  - server/mcp/tool-handlers/bridge.ts
 db_tables: []
 depends_on:
   - specs/db/operations/credits.spec.md
@@ -85,6 +86,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `inferCommitType` | `(branchName: string, description: string)` | `CommitType` | Infer a conventional commit type from branch name prefix or keyword matching in branch slug and task description; defaults to `'chore'` |
 | `formatCommitMessage` | `(description: string, branchName: string, agent: { name, model } \| null \| undefined, collaborators?)` | `string` | Format a conventional commit message with type prefix inferred from branch/description, plus optional Co-Authored-By trailers for agent and human collaborators |
 | `HumanCollaborator` | interface | `{ displayName, githubUsername? }` | Represents a human collaborator for attribution in PRs, issues, and commits |
+| `inferCommitType` | `(branchName: string, description: string)` | `CommitType` | Infer conventional commit type from branch name and description |
+| `formatCommitMessage` | `(description: string, branchName: string, agent: { name, model } \| null \| undefined, collaborators?)` | `string` | Format a conventional commit message with type prefix and trailers |
 
 ### Exported Functions
 
@@ -146,12 +149,16 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleObservationStats` | `(ctx)` | `Promise<CallToolResult>` | Get observation count statistics by status |
 | `handleDiscordSendMessage` | `(ctx, { channel_id, message, reply_to? })` | `Promise<CallToolResult>` | Send a text message to a Discord channel by ID |
 | `handleDiscordSendImage` | `(ctx, { channel_id, image_base64, filename?, content_type?, message? })` | `Promise<CallToolResult>` | Send an image (base64) to a Discord channel, optionally with a text message |
+| `handleBridgeListSessions` | `(ctx, {})` | `Promise<CallToolResult>` | List active bridge sessions with ID, label, project, capabilities, and timestamps |
+| `handleBridgeRequest` | `(ctx, { session_id, request_type, path?, content?, command?, cwd? })` | `Promise<CallToolResult>` | Send a request to a bridge session (file read/write/list, exec, ping) and return the response |
 | `handleBrowser` | `(ctx, { action, tab_id?, url?, query?, selector?, code?, text?, key?, value?, direction?, amount?, x?, y?, full_page?, max_length?, ms? })` | `Promise<CallToolResult>` | Browser automation via Playwright: tab management, navigation, reading, interaction, screenshots, JS execution |
 | `handleLibraryWrite` | `(ctx, { key, content, category?, tags? })` | `Promise<CallToolResult>` | Create or update a shared library entry. Saves to SQLite and mints/updates a CRVLIB ASA on localnet |
 | `handleLibraryRead` | `(ctx, { key?, query?, category?, tag?, limit? })` | `Promise<CallToolResult>` | Read a library entry by key, or search/list entries with optional filters |
 | `handleLibraryListOnChain` | `(ctx, { category?, tag?, limit? })` | `Promise<CallToolResult>` | List all on-chain CRVLIB entries — reads blockchain directly via indexer |
 | `handleLibraryDelete` | `(ctx, { key, mode? })` | `Promise<CallToolResult>` | Delete a shared library entry. Mode is 'soft' (default, archived) or 'hard' (destroyed) |
 | `handleRestartServer` | `(ctx, { reason? })` | `Promise<CallToolResult>` | Safe, idempotent server restart. First call sets `server_restart_initiated_at` and exits with code 75. Post-restart call clears the flag and confirms success |
+| `handleBridgeListSessions` | `(ctx, {})` | `Promise<CallToolResult>` | List active bridge sessions with connection info |
+| `handleBridgeRequest` | `(ctx, { session_id, request_type, path?, content?, command?, cwd? })` | `Promise<CallToolResult>` | Send a typed request to a connected bridge session |
 
 ## Invariants
 
@@ -236,6 +243,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `server/discord/embeds.ts` | `sendDiscordMessage`, `sendMessageWithFiles` |
 | `server/lib/delivery-tracker.ts` | `getDeliveryTracker` |
 | `server/db/observations.ts` | `recordObservation`, `listObservations`, `searchObservations`, `boostObservation`, `dismissObservation`, `countObservations` |
+| `server/bridge/service.ts` | `BridgeService.listSessions()`, `BridgeService.sendRequest()` |
 
 ### Consumed By
 
@@ -269,3 +277,4 @@ Internal constants (not env-configurable):
 | 2026-03-27 | corvid-agent | Added library tool handlers and library.ts to files list |
 | 2026-04-13 | corvid-agent | Added cross-channel-guard.ts: runtime enforcement for TODO(#1067), advisory logging for channel-bound sessions |
 | 2026-05-01 | corvid-agent | Documented handleEscalateWorkTask export from work.ts (#2215) |
+| 2026-05-06 | corvid-agent | Added bridge tool handlers: handleBridgeListSessions, handleBridgeRequest (#2287) |

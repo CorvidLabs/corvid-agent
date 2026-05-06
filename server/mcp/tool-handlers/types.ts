@@ -6,6 +6,7 @@ import type { AgentDirectory } from '../../algochat/agent-directory';
 import type { AgentMessenger } from '../../algochat/agent-messenger';
 import type { AgentWalletService } from '../../algochat/agent-wallet';
 import type { AstParserService } from '../../ast/service';
+import type { BridgeService } from '../../bridge/service';
 import type { BrowserService } from '../../browser/service';
 import type { FlockDirectoryService } from '../../flock-directory/service';
 import type { QuestionDispatcher } from '../../notifications/question-dispatcher';
@@ -79,6 +80,8 @@ export interface McpToolContext {
   flockDirectoryService?: FlockDirectoryService;
   /** Per-session invocation budget for remote agent calls. */
   invocationBudget?: SessionInvocationBudget;
+  /** Bridge service for accessing developer machine bridges. */
+  bridgeService?: BridgeService;
   /** Browser automation service (Playwright + system Chrome). */
   browserService?: BrowserService;
   /** Tool access configuration for session-level guardrails (closes #1054). */

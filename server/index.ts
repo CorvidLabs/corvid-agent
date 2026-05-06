@@ -7,6 +7,7 @@ import {
   wirePostInit,
 } from './algochat/init';
 import { bootstrapServices } from './bootstrap';
+import { BridgeService } from './bridge/service';
 import { getDb, initDb } from './db/connection';
 import { initDiscordConfigFromEnv } from './db/discord-config';
 import { getCurrentVersion } from './db/migrate';
@@ -44,7 +45,7 @@ import { handleOllamaRoutes } from './routes/ollama';
 import { handlePermissionRoutes } from './routes/permissions';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
-import { createWebSocketHandler } from './ws/handler';
+import { createWebSocketHandler, type WsData } from './ws/handler';
 
 const log = createLogger('Server');
 
@@ -133,6 +134,8 @@ const {
   discordBridge,
 } = await bootstrapServices(db, startTime);
 
+const bridgeService = new BridgeService();
+
 // Wire plugin registry into ProcessManager so loaded plugin tools appear in agent sessions
 processManager.setPluginRegistry(pluginRegistry);
 
@@ -162,6 +165,7 @@ const algochatInitDeps: AlgoChatInitDeps = {
   healthMonitorService,
   mentionPollingService,
   flockDirectoryService,
+  bridgeService,
   browserService,
 };
 
@@ -179,14 +183,8 @@ const wsHandler = createWebSocketHandler(
   () => schedulerService,
   () => processManager.ownerQuestionManager,
   () => db,
+  bridgeService,
 );
-
-interface WsData {
-  subscriptions: Map<string, unknown>;
-  walletAddress?: string;
-  authenticated: boolean;
-  tenantId?: string;
-}
 
 /**
  * Check admin authentication for sensitive internal endpoints (/metrics, /api/audit-log).
@@ -320,6 +318,29 @@ const server = Bun.serve<WsData>({
         const resolved = permResponse instanceof Promise ? await permResponse : permResponse;
         return instrumentResponse(resolved, '/api/permissions');
       }
+    }
+
+    // Bridge WebSocket upgrade (developer environment bridge)
+    if (url.pathname === '/api/bridge/ws') {
+      const bridgePreAuth = checkWsAuth(req, url, authConfig);
+      if (authConfig.apiKey && !bridgePreAuth) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
+        });
+      }
+
+      const sessionId = crypto.randomUUID();
+      const upgraded = server.upgrade(rawReq, {
+        data: {
+          subscriptions: new Map(),
+          type: 'bridge' as const,
+          sessionId,
+          authenticated: false,
+        },
+      });
+      if (!upgraded) return new Response('WebSocket upgrade failed', { status: 500 });
+      return undefined as unknown as Response;
     }
 
     // WebSocket upgrade
@@ -532,6 +553,7 @@ const server = Bun.serve<WsData>({
         () => discordBridge?.updateSlashCommands(),
         graduationService,
         pluginRegistry,
+        bridgeService,
       );
       if (apiResponse) {
         // Normalize route for metrics (strip IDs for cardinality control)
