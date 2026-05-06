@@ -57,6 +57,7 @@ import type { SandboxManager } from '../sandbox/manager';
 import type { SchedulerService } from '../scheduler/service';
 import type { TenantService } from '../tenant/context';
 import type { WebhookService } from '../webhooks/service';
+import type { BridgeService } from '../bridge/service';
 import type { WorkTaskService } from '../work/service';
 import type { WorkflowService } from '../workflow/service';
 import { handleA2ARoutes } from './a2a';
@@ -67,6 +68,7 @@ import { handleAuthFlowRoutes } from './auth-flow';
 import { handleBillingRoutes } from './billing';
 import { handleBlockExplorerRoutes } from './block-explorer';
 import { handleBrainViewerRoutes } from './brain-viewer';
+import { handleDevBridgeRoutes } from './bridge';
 import { handleBridgeDeliveryRoutes } from './bridge-delivery';
 import { handleBuddyRoutes } from './buddy';
 import { handleContactRoutes } from './contacts';
@@ -177,6 +179,7 @@ export interface RouteServices {
   outcomeTracker?: OutcomeTrackerService | null;
   flockDirectory?: FlockDirectoryService | null;
   pluginRegistry?: PluginRegistry | null;
+  bridgeService?: BridgeService | null;
 }
 
 export async function handleRequest(
@@ -208,6 +211,7 @@ export async function handleRequest(
   onAgentChange?: (() => void) | null,
   graduationService?: MemoryGraduationService | null,
   pluginRegistry?: PluginRegistry | null,
+  bridgeService?: BridgeService | null,
 ): Promise<Response | null> {
   const url = new URL(req.url);
   const config = getAuthConfig();
@@ -301,6 +305,7 @@ export async function handleRequest(
       onAgentChange,
       graduationService,
       pluginRegistry,
+      bridgeService,
     );
     if (response) {
       applyCors(response, req, config);
@@ -348,6 +353,7 @@ async function handleRoutes(
   onAgentChange?: (() => void) | null,
   graduationService?: MemoryGraduationService | null,
   pluginRegistry?: PluginRegistry | null,
+  bridgeService?: BridgeService | null,
 ): Promise<Response | null> {
   if (url.pathname === '/api/browse-dirs' && req.method === 'GET') {
     return handleBrowseDirs(req, url, db);
@@ -421,6 +427,9 @@ async function handleRoutes(
 
   const bridgeDeliveryResponse = handleBridgeDeliveryRoutes(req, url);
   if (bridgeDeliveryResponse) return bridgeDeliveryResponse;
+
+  const devBridgeResponse = handleDevBridgeRoutes(req, url, db, context, bridgeService ?? null);
+  if (devBridgeResponse) return devBridgeResponse;
 
   const discordImageResponse = handleDiscordImageRoutes(req, url, context);
   if (discordImageResponse)
