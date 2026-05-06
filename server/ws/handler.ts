@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ServerWebSocket } from 'bun';
+import type { BridgeService } from '../bridge/service';
+import type { BridgeWsData } from '../bridge/types';
 import type { ClientMessage, ServerMessage, StreamEvent } from '../../shared/ws-protocol';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { AgentMessenger } from '../algochat/agent-messenger';
@@ -104,9 +106,53 @@ export function createWebSocketHandler(
   getSchedulerService?: () => SchedulerService | null,
   getOwnerQuestionManager?: () => OwnerQuestionManager | null,
   getDb?: () => Database,
+  bridgeService?: BridgeService,
 ) {
+  function handleBridgeMessage(
+    ws: ServerWebSocket<BridgeWsData>,
+    message: string | Buffer,
+    service: BridgeService,
+  ): void {
+    const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      ws.send(JSON.stringify({ error: 'Invalid JSON' }));
+      return;
+    }
+
+    const data = ws.data;
+
+    if (!data.authenticated) {
+      if (parsed.type !== 'auth' || !parsed.token) {
+        ws.send(JSON.stringify({ error: 'First message must be auth' }));
+        ws.close(1008, 'Auth required');
+        return;
+      }
+      data.authenticated = true;
+      service.registerSession(
+        data.sessionId,
+        parsed.label ?? 'unnamed',
+        parsed.projectId ?? '',
+        parsed.capabilities ?? { read: true, write: false, exec: false },
+        ws,
+      );
+      ws.send(JSON.stringify({ type: 'auth_ok', sessionId: data.sessionId }));
+      return;
+    }
+
+    if (parsed.id && parsed.type && typeof parsed.success === 'boolean') {
+      service.handleResponse(data.sessionId, parsed);
+    }
+  }
+
   return {
     open(ws: ServerWebSocket<WsData>) {
+      if ((ws.data as any).type === 'bridge') {
+        log.info(`Bridge WebSocket opened: ${(ws.data as any).sessionId}`);
+        return;
+      }
       // authenticated flag is set during upgrade in index.ts
       const isAuthenticated = ws.data?.authenticated ?? false;
       const tid = ws.data?.tenantId;
@@ -137,6 +183,10 @@ export function createWebSocketHandler(
     },
 
     message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
+      if ((ws.data as any).type === 'bridge') {
+        handleBridgeMessage(ws as any, message, bridgeService!);
+        return;
+      }
       const raw = typeof message === 'string' ? message : message.toString();
       log.debug('WS message received', { raw: raw.slice(0, 200) });
 
@@ -212,6 +262,10 @@ export function createWebSocketHandler(
     },
 
     close(ws: ServerWebSocket<WsData>) {
+      if ((ws.data as any).type === 'bridge') {
+        bridgeService?.removeSession((ws.data as any).sessionId);
+        return;
+      }
       // Stop all timers
       stopHeartbeat(ws);
       clearAuthTimeout(ws);
