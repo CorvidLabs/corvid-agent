@@ -292,7 +292,7 @@ export function createWebSocketHandler(
     },
 
     close(ws: ServerWebSocket<WsData>) {
-      if ((ws.data as any).type === 'bridge') {
+      if ((ws.data as any)?.type === 'bridge') {
         const bridgeData = ws.data as unknown as BridgeWsData;
         if (bridgeData.authTimeoutTimer) {
           clearTimeout(bridgeData.authTimeoutTimer);
