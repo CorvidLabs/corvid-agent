@@ -578,3 +578,107 @@ export async function getPrState(
 export function isGitHubConfigured(): boolean {
   return hasGhToken();
 }
+
+// ─── PR Auto-Labeling ────────────────────────────────────────────────────────
+
+const COMMIT_TYPE_LABEL_MAP: Record<string, string> = {
+  feat: 'type:feature',
+  fix: 'type:bugfix',
+  chore: 'type:chore',
+  docs: 'type:docs',
+  refactor: 'type:refactor',
+  test: 'type:test',
+  perf: 'type:perf',
+  ci: 'type:ci',
+  build: 'type:build',
+};
+
+const TYPE_LABEL_COLORS: Record<string, string> = {
+  'type:feature': '0075ca',
+  'type:bugfix': 'd73a4a',
+  'type:chore': 'e4e669',
+  'type:docs': '0075ca',
+  'type:refactor': '7057ff',
+  'type:test': '008672',
+  'type:perf': 'fbca04',
+  'type:ci': 'c2e0c6',
+  'type:build': 'fef2c0',
+};
+
+const AGENT_LABEL_COLOR = '6f42c1';
+
+/**
+ * Infer GitHub label names from a PR title and optional agent name.
+ * Maps conventional commit prefix to a type label and adds an agent label.
+ */
+export function inferPrLabels(title: string, agentName?: string): string[] {
+  const labels: string[] = [];
+  const match = title.match(/^(\w+)(?:\([^)]+\))?[!]?:/);
+  if (match) {
+    const prefix = match[1].toLowerCase();
+    const typeLabel = COMMIT_TYPE_LABEL_MAP[prefix];
+    if (typeLabel) labels.push(typeLabel);
+  }
+  if (agentName) labels.push(`agent:${agentName.toLowerCase()}`);
+  return labels;
+}
+
+/**
+ * Ensure a label exists on a repo; create it with the given hex color if missing.
+ * Fails silently — label conflicts (422) are ignored.
+ */
+export async function ensureLabelExists(repo: string, name: string, color: string): Promise<void> {
+  await runGh(['api', `repos/${repo}/labels`, '-X', 'POST', '-f', `name=${name}`, '-f', `color=${color}`]);
+}
+
+/**
+ * Apply labels to an existing PR identified by URL.
+ * Creates missing labels, then applies them via `gh pr edit`.
+ * Only operates on repos in the CorvidLabs org (or GITHUB_ALLOWED_ORGS if set).
+ * All label operations fail silently — PR creation is never blocked.
+ */
+export async function applyPrLabels(repo: string, prUrl: string, labels: string[]): Promise<void> {
+  if (labels.length === 0) return;
+  const prNumberMatch = prUrl.match(/\/pull\/(\d+)$/);
+  if (!prNumberMatch) return;
+  const prNumber = prNumberMatch[1];
+
+  for (const label of labels) {
+    const color = TYPE_LABEL_COLORS[label] ?? AGENT_LABEL_COLOR;
+    try {
+      await ensureLabelExists(repo, label, color);
+    } catch {
+      // ignore — label may already exist or creation may be denied
+    }
+  }
+
+  try {
+    await runGh(['pr', 'edit', prNumber, '--repo', repo, '--add-label', labels.join(',')]);
+  } catch {
+    // ignore — labeling failure must not block PR creation
+  }
+}
+
+export function isOrgLabelable(owner: string, allowedOrgs?: ReadonlySet<string> | string[]): boolean {
+  if (!owner) return false;
+  if (allowedOrgs) {
+    if (allowedOrgs instanceof Set) return allowedOrgs.size > 0 && allowedOrgs.has(owner);
+    if (Array.isArray(allowedOrgs)) return allowedOrgs.length > 0 && allowedOrgs.includes(owner);
+  }
+  return owner.toLowerCase() === 'corvidlabs';
+}
+
+export async function labelPrIfAllowed(
+  repo: string,
+  prUrl: string,
+  title: string,
+  agentName?: string,
+  allowedOrgs?: ReadonlySet<string> | string[],
+): Promise<void> {
+  const owner = repo.split('/')[0] ?? '';
+  if (!isOrgLabelable(owner, allowedOrgs)) return;
+  const labels = inferPrLabels(title, agentName);
+  if (labels.length > 0) {
+    await applyPrLabels(repo, prUrl, labels);
+  }
+}

@@ -4,6 +4,7 @@ import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { clearWorktreeDir, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
+import { labelPrIfAllowed } from '../github/operations';
 import { formatPrBody } from '../github/pr-body';
 import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
@@ -297,6 +298,19 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
     const prUrl = prStdout.match(PR_URL_REGEX)?.[0] ?? null;
     if (prUrl) {
       log.info('Fallback: PR created successfully', { taskId, prUrl });
+      try {
+        const repoMatch = prUrl.match(/github\.com\/([^/]+\/[^/]+)\/pull\/\d+/);
+        const repo = repoMatch?.[1];
+        if (repo) {
+          const allowedOrgs = (process.env.GITHUB_ALLOWED_ORGS ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+          await labelPrIfAllowed(repo, prUrl, title, agent?.name ?? undefined, allowedOrgs);
+        }
+      } catch {
+        // Label failure must not block PR creation
+      }
     }
     return prUrl;
   } catch (err) {
