@@ -93,6 +93,8 @@ const {
   formatAgentSignature,
   formatCoAuthoredBy,
   formatHumanCoAuthoredBy,
+  formatCommitMessage,
+  inferCommitType,
   resolveCollaborator,
   resolveRequestedBy,
 } = await import('../mcp/tool-handlers/github');
@@ -1117,5 +1119,110 @@ describe('resolveRequestedBy', () => {
       { displayName: 'kyntrin', githubUsername: 'kyntrin' },
       { displayName: '181969874455756800', githubUsername: undefined },
     ]);
+  });
+});
+
+// ── inferCommitType (#2274) ──────────────────────────────────────────────
+
+describe('inferCommitType (#2274)', () => {
+  test('detects fix from branch slug keyword', () => {
+    expect(inferCommitType('agent/jackdaw/fix-the-bug-123', 'Fix the bug')).toBe('fix');
+  });
+
+  test('detects feat from branch slug keyword', () => {
+    expect(inferCommitType('agent/jackdaw/add-new-feature', 'Add new feature')).toBe('feat');
+  });
+
+  test('detects fix from conventional branch prefix', () => {
+    expect(inferCommitType('fix/broken-login', 'Broken login')).toBe('fix');
+  });
+
+  test('detects feat from conventional branch prefix', () => {
+    expect(inferCommitType('feat/new-dashboard', 'New dashboard')).toBe('feat');
+  });
+
+  test('falls back to description when branch slug has no keyword match', () => {
+    expect(inferCommitType('agent/jackdaw/task-2274', 'Fix TypeScript errors')).toBe('fix');
+  });
+
+  test('detects docs from description', () => {
+    expect(inferCommitType('agent/jackdaw/task-2274', 'Update readme')).toBe('docs');
+  });
+
+  test('detects test from branch slug', () => {
+    expect(inferCommitType('agent/jackdaw/test-coverage', 'Increase test coverage')).toBe('test');
+  });
+
+  test('detects refactor from description', () => {
+    expect(inferCommitType('agent/jackdaw/task-2274', 'Refactor the auth module')).toBe('refactor');
+  });
+
+  test('detects chore from description keyword', () => {
+    expect(inferCommitType('agent/jackdaw/task-2274', 'Bump dependencies')).toBe('chore');
+  });
+
+  test('defaults to chore when nothing matches', () => {
+    expect(inferCommitType('agent/jackdaw/task-9999', 'Change something random')).toBe('chore');
+  });
+
+  test('detects type from exact branch name match', () => {
+    expect(inferCommitType('fix', 'Fix something')).toBe('fix');
+  });
+});
+
+// ── formatCommitMessage (#2274) ──────────────────────────────────────────
+
+describe('formatCommitMessage (#2274)', () => {
+  test('produces conventional commit headline with inferred type', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', null);
+    expect(msg).toBe('fix: Fix the bug');
+  });
+
+  test('defaults to chore when type cannot be inferred', () => {
+    const msg = formatCommitMessage('Change something random', 'agent/jackdaw/task-9999', null);
+    expect(msg).toMatch(/^chore:/);
+  });
+
+  test('includes agent Co-Authored-By trailer when agent provided', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', { name: 'Jackdaw', model: 'claude-sonnet-4-6' });
+    expect(msg).toContain('fix: Fix the bug');
+    expect(msg).toContain('Co-Authored-By: Jackdaw (Sonnet 4.6)');
+  });
+
+  test('includes human Co-Authored-By trailer when collaborator provided', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', null, [
+      { displayName: 'Leif', githubUsername: 'kyntrin' },
+    ]);
+    expect(msg).toContain('Co-Authored-By: Leif <kyntrin@users.noreply.github.com>');
+  });
+
+  test('includes both agent and human trailers', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', { name: 'Jackdaw', model: 'claude-sonnet-4-6' }, [
+      { displayName: 'Leif', githubUsername: 'kyntrin' },
+    ]);
+    expect(msg).toContain('Co-Authored-By: Jackdaw (Sonnet 4.6)');
+    expect(msg).toContain('Co-Authored-By: Leif <kyntrin@users.noreply.github.com>');
+  });
+
+  test('separates headline from trailers with a blank line', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', { name: 'Jackdaw', model: 'claude-sonnet-4-6' });
+    const lines = msg.split('\n');
+    expect(lines[0]).toMatch(/^fix:/);
+    expect(lines[1]).toBe('');
+    expect(lines[2]).toMatch(/^Co-Authored-By:/);
+  });
+
+  test('truncates description at 60 chars in headline', () => {
+    const longDesc = 'A'.repeat(80);
+    const msg = formatCommitMessage(longDesc, 'chore/stuff', null);
+    const headline = msg.split('\n')[0];
+    // "chore: " (7) + 60 chars = 67 max
+    expect(headline.length).toBeLessThanOrEqual(67);
+  });
+
+  test('produces no trailers section when agent is null and no collaborators', () => {
+    const msg = formatCommitMessage('Fix the bug', 'fix/the-bug', null);
+    expect(msg).not.toContain('Co-Authored-By');
+    expect(msg).not.toContain('\n\n');
   });
 });
