@@ -209,6 +209,8 @@ function mapAsset(asset: Record<string, unknown>, metadata?: Arc69Note): Explore
 
 type IndexerClient = import('algosdk').default.Indexer;
 type AlgodClient = import('algosdk').default.Algodv2;
+type TransactionQuery = ReturnType<IndexerClient['searchForTransactions']>;
+type AssetQuery = ReturnType<IndexerClient['searchForAssets']>;
 
 // ── Route handler ──────────────────────────────────────────────────
 
@@ -288,8 +290,7 @@ async function handleTransactionList(url: URL, indexer: IndexerClient): Promise<
     const toRound = url.searchParams.get('to_round');
     const nextToken = url.searchParams.get('next') ?? undefined;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query: any = indexer.searchForTransactions().limit(limit);
+    let query: TransactionQuery = indexer.searchForTransactions().limit(limit);
 
     if (nextToken) query = query.nextToken(nextToken);
 
@@ -323,7 +324,7 @@ async function handleTransactionList(url: URL, indexer: IndexerClient): Promise<
       transactions,
       total: transactions.length,
       limit,
-      nextToken: (response['next-token'] as string | undefined) ?? null,
+      nextToken: response.nextToken ?? null,
     });
   } catch (err) {
     return json({ error: 'Failed to query transactions', detail: String(err) }, 500);
@@ -358,8 +359,7 @@ async function handleAssetList(url: URL, indexer: IndexerClient): Promise<Respon
     const allAssets: ExplorerAsset[] = [];
 
     for (const unit of unitNames) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query: any = indexer.searchForAssets().unit(unit).limit(limit);
+      let query: AssetQuery = indexer.searchForAssets().unit(unit).limit(limit);
       if (creator) query = query.creator(creator);
 
       const response = await query.do();
