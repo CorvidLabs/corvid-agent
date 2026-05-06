@@ -6,6 +6,7 @@ import * as github from '../../github/operations';
 import { checkInternPrGuard } from '../../work/intern-guard';
 import {
   checkSchedulerRateLimit,
+  getSchedulerAllowedOrgs,
   isRepoAllowedForScheduler,
   SCHEDULER_ESCALATION_LABEL,
 } from '../scheduler-tool-gating';
@@ -264,6 +265,27 @@ export async function handleGitHubCreatePr(
     const bodyWithSig = args.body + buildAgentSignature(ctx, collaborators);
     const result = await github.createPr(args.repo, args.title, bodyWithSig, args.head, args.base ?? 'main');
     if (!result.ok) return errorResult(result.error ?? 'Failed to create PR');
+
+    if (result.prUrl) {
+      let prAgent: { name: string; model: string } | null = null;
+      try {
+        prAgent = getAgent(ctx.db, ctx.agentId);
+      } catch {
+        // Proceed without agent name
+      }
+      try {
+        const labels = github.inferPrLabels(args.title, prAgent?.name ?? undefined);
+        const owner = args.repo.split('/')[0] ?? '';
+        const allowedOrgs = getSchedulerAllowedOrgs();
+        const isLabelable = allowedOrgs.size > 0 ? allowedOrgs.has(owner) : owner.toLowerCase() === 'corvidlabs';
+        if (labels.length > 0 && isLabelable) {
+          await github.applyPrLabels(args.repo, result.prUrl, labels);
+        }
+      } catch {
+        // Label failure must not block PR creation
+      }
+    }
+
     return textResult(`PR created: ${result.prUrl ?? 'success'}`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

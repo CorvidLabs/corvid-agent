@@ -62,6 +62,9 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 | `getPrState` | `repo: string, prNumber: number` | `Promise<{ ok: boolean; pr?: PrViewResult; error?: string }>` | Gets the state of a PR (open/closed/merged, checks, review decision) |
 | `searchOpenPrsForIssue` | `repo: string, issueNumber: number` | `Promise<{ ok: boolean; prs: PullRequest[]; error?: string }>` | Searches open PRs for references to a given issue number (`#NNN` in title or body). Used to deduplicate before creating new work |
 | `isGitHubConfigured` | (none) | `boolean` | Returns true if GH_TOKEN is set in the environment |
+| `inferPrLabels` | `title: string, agentName?: string` | `string[]` | Returns GitHub label names inferred from a PR title (conventional commit prefix → type label) plus an optional agent label |
+| `ensureLabelExists` | `repo: string, name: string, color: string` | `Promise<void>` | Creates a label on a repo if it doesn't exist; 422 conflicts are silently ignored |
+| `applyPrLabels` | `repo: string, prUrl: string, labels: string[]` | `Promise<void>` | Ensures labels exist and applies them to the PR identified by URL; fails silently on all errors |
 
 ### Exported Types
 
@@ -82,6 +85,9 @@ Provides GitHub operations via the `gh` CLI (stars, forks, PRs, issues, reviews,
 7. `findSimilarIssues` uses Jaccard similarity with configurable threshold (default 0.5) and filters stop words from title comparisons.
 8. `createIssueWithDedup` returns the existing issue URL with `deduplicated: true` if a similar issue is found, instead of creating a duplicate.
 9. All `gh` CLI calls use `buildSafeGhEnv()` to construct a sanitized environment.
+10. `applyPrLabels` only operates on repos whose org matches `GITHUB_ALLOWED_ORGS` (if set) or defaults to the `corvidlabs` org.
+11. `applyPrLabels` fails silently on all errors — PR creation is never blocked by label operations.
+12. `inferPrLabels` maps conventional commit prefixes (feat, fix, chore, docs, refactor, test, perf, ci, build) to `type:*` labels and appends an `agent:*` label when `agentName` is provided.
 
 ## Behavioral Examples
 
