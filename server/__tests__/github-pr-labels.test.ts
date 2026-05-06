@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { applyPrLabels, ensureLabelExists, inferPrLabels } from '../github/operations';
 
 describe('inferPrLabels', () => {
@@ -90,13 +90,37 @@ const originalGhToken = process.env.GH_TOKEN;
 describe('applyPrLabels', () => {
   let spawnSpy: ReturnType<typeof mockSpawn>;
 
-  beforeEach(() => {
-    process.env.GH_TOKEN = 'test-token';
+  beforeAll(() => {
     spawnSpy = mockSpawn();
   });
 
-  afterEach(() => {
+  afterAll(() => {
     spawnSpy.mockRestore();
+  });
+
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token';
+    spawnSpy.mockClear();
+    spawnSpy.mockImplementation(
+      () =>
+        ({
+          stdout: new ReadableStream({
+            start(c) {
+              c.enqueue(new TextEncoder().encode(''));
+              c.close();
+            },
+          }),
+          stderr: new ReadableStream({
+            start(c) {
+              c.close();
+            },
+          }),
+          exited: Promise.resolve(0),
+        }) as ReturnType<typeof Bun.spawn>,
+    );
+  });
+
+  afterEach(() => {
     if (originalGhToken) {
       process.env.GH_TOKEN = originalGhToken;
     } else {
@@ -139,8 +163,7 @@ describe('applyPrLabels', () => {
 
   test('continues when ensureLabelExists throws', async () => {
     let callCount = 0;
-    spawnSpy.mockRestore();
-    spawnSpy = spyOn(Bun, 'spawn').mockImplementation(() => {
+    spawnSpy.mockImplementation(() => {
       callCount++;
       if (callCount === 1) throw new Error('API error');
       return {
@@ -165,8 +188,7 @@ describe('applyPrLabels', () => {
   });
 
   test('does not throw when gh pr edit fails', async () => {
-    spawnSpy.mockRestore();
-    spawnSpy = spyOn(Bun, 'spawn').mockImplementation(
+    spawnSpy.mockImplementation(
       () =>
         ({
           stdout: new ReadableStream({
@@ -194,13 +216,20 @@ describe('applyPrLabels', () => {
 describe('ensureLabelExists', () => {
   let spawnSpy: ReturnType<typeof mockSpawn>;
 
-  beforeEach(() => {
-    process.env.GH_TOKEN = 'test-token';
+  beforeAll(() => {
     spawnSpy = mockSpawn();
   });
 
-  afterEach(() => {
+  afterAll(() => {
     spawnSpy.mockRestore();
+  });
+
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token';
+    spawnSpy.mockClear();
+  });
+
+  afterEach(() => {
     if (originalGhToken) {
       process.env.GH_TOKEN = originalGhToken;
     } else {
