@@ -42,6 +42,8 @@ export interface WsData {
   authTimeoutTimer?: ReturnType<typeof setTimeout> | null;
   /** Track work-task completion callbacks so they can be removed on disconnect. */
   workTaskCallbacks?: Map<string, (task: import('../../shared/types').WorkTask) => void>;
+  type?: string;
+  sessionId?: string;
 }
 
 /**

@@ -193,6 +193,8 @@ interface WsData {
   walletAddress?: string;
   authenticated: boolean;
   tenantId?: string;
+  type?: string;
+  sessionId?: string;
 }
 
 /**
@@ -342,6 +344,7 @@ const server = Bun.serve<WsData>({
       const sessionId = crypto.randomUUID();
       const upgraded = server.upgrade(rawReq, {
         data: {
+          subscriptions: new Map(),
           type: 'bridge' as const,
           sessionId,
           subscriptions: new Map(),
