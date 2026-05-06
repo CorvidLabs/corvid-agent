@@ -30,6 +30,7 @@ files:
   - server/mcp/tool-handlers/discord.ts
   - server/mcp/tool-handlers/library.ts
   - server/mcp/tool-handlers/server-ops.ts
+  - server/mcp/tool-handlers/bridge.ts
 db_tables: []
 depends_on:
   - specs/db/operations/credits.spec.md
@@ -83,6 +84,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `inferCommitType` | `(branchName: string, description: string)` | `CommitType` | Infer a conventional commit type from branch name prefix or keyword matching in branch slug and task description; defaults to `'chore'` |
 | `formatCommitMessage` | `(description: string, branchName: string, agent: { name, model } \| null \| undefined, collaborators?)` | `string` | Format a conventional commit message with type prefix inferred from branch/description, plus optional Co-Authored-By trailers for agent and human collaborators |
 | `HumanCollaborator` | interface | `{ displayName, githubUsername? }` | Represents a human collaborator for attribution in PRs, issues, and commits |
+| `inferCommitType` | `(branchName: string, description: string)` | `CommitType` | Infer conventional commit type from branch name and description |
+| `formatCommitMessage` | `(description: string, branchName: string, agent: { name, model } \| null \| undefined, collaborators?)` | `string` | Format a conventional commit message with type prefix and trailers |
 
 ### Exported Functions
 
@@ -144,6 +147,8 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleObservationStats` | `(ctx)` | `Promise<CallToolResult>` | Get observation count statistics by status |
 | `handleDiscordSendMessage` | `(ctx, { channel_id, message, reply_to? })` | `Promise<CallToolResult>` | Send a text message to a Discord channel by ID |
 | `handleDiscordSendImage` | `(ctx, { channel_id, image_base64, filename?, content_type?, message? })` | `Promise<CallToolResult>` | Send an image (base64) to a Discord channel, optionally with a text message |
+| `handleBridgeListSessions` | `(ctx, {})` | `Promise<CallToolResult>` | List active bridge sessions with ID, label, project, capabilities, and timestamps |
+| `handleBridgeRequest` | `(ctx, { session_id, request_type, path?, content?, command?, cwd? })` | `Promise<CallToolResult>` | Send a request to a bridge session (file read/write/list, exec, ping) and return the response |
 | `handleBrowser` | `(ctx, { action, tab_id?, url?, query?, selector?, code?, text?, key?, value?, direction?, amount?, x?, y?, full_page?, max_length?, ms? })` | `Promise<CallToolResult>` | Browser automation via Playwright: tab management, navigation, reading, interaction, screenshots, JS execution |
 | `handleLibraryWrite` | `(ctx, { key, content, category?, tags? })` | `Promise<CallToolResult>` | Create or update a shared library entry. Saves to SQLite and mints/updates a CRVLIB ASA on localnet |
 | `handleLibraryRead` | `(ctx, { key?, query?, category?, tag?, limit? })` | `Promise<CallToolResult>` | Read a library entry by key, or search/list entries with optional filters |

@@ -1,8 +1,12 @@
-import { createLogger } from '../lib/logger';
-import type { BridgeSession } from './types';
-import type { BridgeCapabilities, BridgeRequest, BridgeResponse, BridgeSessionInfo } from '../../shared/bridge-protocol';
 import type { ServerWebSocket } from 'bun';
-import type { BridgeWsData } from './types';
+import type {
+  BridgeCapabilities,
+  BridgeRequest,
+  BridgeResponse,
+  BridgeSessionInfo,
+} from '../../shared/bridge-protocol';
+import { createLogger } from '../lib/logger';
+import type { BridgeSession, BridgeWsData } from './types';
 
 const log = createLogger('BridgeService');
 

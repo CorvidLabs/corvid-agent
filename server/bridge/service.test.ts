@@ -1,6 +1,6 @@
-import { describe, expect, test, beforeEach, mock } from 'bun:test';
-import { BridgeService } from './service';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { BridgeCapabilities, BridgeRequest, BridgeResponse } from '../../shared/bridge-protocol';
+import { BridgeService } from './service';
 
 function makeMockWs() {
   return { send: mock(() => {}), readyState: 1 } as any;

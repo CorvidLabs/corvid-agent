@@ -1,11 +1,11 @@
 import type { Database } from 'bun:sqlite';
 import type { ServerWebSocket } from 'bun';
-import type { BridgeService } from '../bridge/service';
-import type { BridgeWsData } from '../bridge/types';
 import type { ClientMessage, ServerMessage, StreamEvent } from '../../shared/ws-protocol';
 import { isClientMessage } from '../../shared/ws-protocol';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AlgoChatBridge } from '../algochat/bridge';
+import type { BridgeService } from '../bridge/service';
+import type { BridgeWsData } from '../bridge/types';
 import { getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import type { AuthConfig } from '../middleware/auth';
@@ -176,7 +176,9 @@ export function createWebSocketHandler(
           log.warn(`Bridge auth timeout — closing unauthenticated connection: ${bridgeData.sessionId}`);
           try {
             ws.close(4001, 'Authentication timeout');
-          } catch { /* already closed */ }
+          } catch {
+            /* already closed */
+          }
         }, AUTH_TIMEOUT_MS);
         log.info(`Bridge WebSocket opened: ${bridgeData.sessionId}`);
         return;

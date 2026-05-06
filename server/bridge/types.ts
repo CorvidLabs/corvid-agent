@@ -1,5 +1,10 @@
 import type { ServerWebSocket } from 'bun';
-import type { BridgeCapabilities, BridgeRequest, BridgeResponse, BridgeSessionInfo } from '../../shared/bridge-protocol';
+import type {
+  BridgeCapabilities,
+  BridgeRequest,
+  BridgeResponse,
+  BridgeSessionInfo,
+} from '../../shared/bridge-protocol';
 
 export interface BridgeSession {
   sessionId: string;
@@ -9,11 +14,14 @@ export interface BridgeSession {
   ws: ServerWebSocket<BridgeWsData>;
   connectedAt: Date;
   lastActivity: Date;
-  pendingRequests: Map<string, {
-    resolve: (response: BridgeResponse) => void;
-    reject: (error: Error) => void;
-    timer: ReturnType<typeof setTimeout>;
-  }>;
+  pendingRequests: Map<
+    string,
+    {
+      resolve: (response: BridgeResponse) => void;
+      reject: (error: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >;
 }
 
 export interface BridgeWsData {

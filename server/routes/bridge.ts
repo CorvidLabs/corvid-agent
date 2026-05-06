@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
+import type { BridgeService } from '../bridge/service';
 import { json } from '../lib/response';
 import type { RequestContext } from '../middleware/guards';
-import type { BridgeService } from '../bridge/service';
 
 export function handleDevBridgeRoutes(
   req: Request,

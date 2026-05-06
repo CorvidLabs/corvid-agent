@@ -4,7 +4,6 @@ import { getAgent } from '../db/agents';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import type { McpToolContext } from './tool-handlers';
-import { handleBridgeListSessions, handleBridgeRequest } from './tool-handlers/bridge';
 import {
   handleAskOwner,
   handleBrowser,
@@ -56,6 +55,7 @@ import {
   handleVerifyAgentReputation,
   handleWebSearch,
 } from './tool-handlers';
+import { handleBridgeListSessions, handleBridgeRequest } from './tool-handlers/bridge';
 import { handleLookupContact } from './tool-handlers/contacts';
 import { handleDiscordSendImage, handleDiscordSendMessage } from './tool-handlers/discord';
 import {

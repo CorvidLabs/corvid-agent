@@ -7,6 +7,7 @@ import {
   wirePostInit,
 } from './algochat/init';
 import { bootstrapServices } from './bootstrap';
+import { BridgeService } from './bridge/service';
 import { getDb, initDb } from './db/connection';
 import { initDiscordConfigFromEnv } from './db/discord-config';
 import { getCurrentVersion } from './db/migrate';
@@ -44,7 +45,6 @@ import { handleOllamaRoutes } from './routes/ollama';
 import { handlePermissionRoutes } from './routes/permissions';
 import { extractTenantId } from './tenant/middleware';
 import { DEFAULT_TENANT_ID } from './tenant/types';
-import { BridgeService } from './bridge/service';
 import { createWebSocketHandler } from './ws/handler';
 
 const log = createLogger('Server');
@@ -187,6 +187,8 @@ const wsHandler = createWebSocketHandler(
 );
 
 interface WsData {
+  type?: 'bridge';
+  sessionId?: string;
   subscriptions: Map<string, unknown>;
   walletAddress?: string;
   authenticated: boolean;
@@ -342,6 +344,7 @@ const server = Bun.serve<WsData>({
         data: {
           type: 'bridge' as const,
           sessionId,
+          subscriptions: new Map(),
           authenticated: false,
         },
       });
