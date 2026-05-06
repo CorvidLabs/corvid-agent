@@ -59,7 +59,7 @@ describe('warm turn skips context reconstruction', () => {
   test('warm turn delivers via sendMessage without calling buildResumePrompt', () => {
     let buildResumePromptCalled = false;
     const original = (pm as any).buildResumePrompt.bind(pm);
-    (pm as any).buildResumePrompt = function (...args: unknown[]) {
+    (pm as any).buildResumePrompt = (...args: unknown[]) => {
       buildResumePromptCalled = true;
       return original(...args);
     };
@@ -111,7 +111,7 @@ describe('warm turn skips context reconstruction', () => {
   test('warm turn with no prompt does not trigger reconstruction', () => {
     let buildResumePromptCalled = false;
     const original = (pm as any).buildResumePrompt.bind(pm);
-    (pm as any).buildResumePrompt = function (...args: unknown[]) {
+    (pm as any).buildResumePrompt = (...args: unknown[]) => {
       buildResumePromptCalled = true;
       return original(...args);
     };
@@ -129,7 +129,7 @@ describe('cold start triggers context reconstruction', () => {
   test('dead process causes buildResumePrompt to be called on cold start', () => {
     let buildResumePromptCalled = false;
     const original = (pm as any).buildResumePrompt.bind(pm);
-    (pm as any).buildResumePrompt = function (...args: unknown[]) {
+    (pm as any).buildResumePrompt = (...args: unknown[]) => {
       buildResumePromptCalled = true;
       return original(...args);
     };
@@ -158,7 +158,7 @@ describe('cold start triggers context reconstruction', () => {
   test('no existing process causes buildResumePrompt to run', () => {
     let buildResumePromptCalled = false;
     const original = (pm as any).buildResumePrompt.bind(pm);
-    (pm as any).buildResumePrompt = function (...args: unknown[]) {
+    (pm as any).buildResumePrompt = (...args: unknown[]) => {
       buildResumePromptCalled = true;
       return original(...args);
     };
@@ -182,7 +182,7 @@ describe('cold start triggers context reconstruction', () => {
   test('warm path failure falls through to cold-start reconstruction', () => {
     let buildResumePromptCalled = false;
     const original = (pm as any).buildResumePrompt.bind(pm);
-    (pm as any).buildResumePrompt = function (...args: unknown[]) {
+    (pm as any).buildResumePrompt = (...args: unknown[]) => {
       buildResumePromptCalled = true;
       return original(...args);
     };
