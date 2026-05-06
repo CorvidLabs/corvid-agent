@@ -76,6 +76,61 @@ export function formatCoAuthoredBy(agent: { name: string; model: string } | null
   return `Co-Authored-By: ${agent.name} (${modelDisplay})`;
 }
 
+const COMMIT_TYPES = ['feat', 'fix', 'docs', 'test', 'refactor', 'perf', 'ci', 'build', 'chore'] as const;
+type CommitType = (typeof COMMIT_TYPES)[number];
+
+const TYPE_PATTERNS: Record<CommitType, RegExp> = {
+  feat: /\b(feat|feature|add|implement|introduce|support|new|create)\b/i,
+  fix: /\b(fix|bug|patch|correct|resolve|repair|broken)\b/i,
+  docs: /\b(docs?|document|readme|changelog)\b/i,
+  test: /\b(test|spec|coverage)\b/i,
+  refactor: /\b(refactor|restructure|reorganize|rewrite|cleanup)\b/i,
+  perf: /\b(perf|performance|optimize|speed|faster)\b/i,
+  ci: /\b(ci|workflow|pipeline|action)\b/i,
+  build: /\b(build|bundle|compile|package)\b/i,
+  chore: /\b(chore|update|upgrade|bump|lint|format|config|version)\b/i,
+};
+
+/** Infer a conventional commit type from branch name and task description (#2274). */
+export function inferCommitType(branchName: string, description: string): CommitType {
+  // Conventional prefix wins (e.g., "fix/...", "feat/...", "fix-...")
+  for (const type of COMMIT_TYPES) {
+    if (branchName === type || branchName.startsWith(`${type}/`) || branchName.startsWith(`${type}-`)) {
+      return type;
+    }
+  }
+  // Keyword search in branch slug (last path segment)
+  const branchSlug = branchName.split('/').pop() ?? branchName;
+  for (const type of COMMIT_TYPES) {
+    if (TYPE_PATTERNS[type].test(branchSlug)) return type;
+  }
+  // Keyword search in task description
+  for (const type of COMMIT_TYPES) {
+    if (TYPE_PATTERNS[type].test(description)) return type;
+  }
+  return 'chore';
+}
+
+/**
+ * Format a conventional commit message with optional Co-Authored-By trailers (#2274).
+ * Used by the service-level fallback commit in work task PR creation.
+ */
+export function formatCommitMessage(
+  description: string,
+  branchName: string,
+  agent: { name: string; model: string } | null | undefined,
+  collaborators?: HumanCollaborator[],
+): string {
+  const type = inferCommitType(branchName, description);
+  const subject = description.slice(0, 60).trim();
+  const headline = `${type}: ${subject}`;
+  const trailers: string[] = [];
+  if (agent) trailers.push(formatCoAuthoredBy(agent));
+  for (const c of collaborators ?? []) trailers.push(formatHumanCoAuthoredBy(c));
+  const trailerStr = trailers.filter(Boolean).join('\n');
+  return trailerStr ? `${headline}\n\n${trailerStr}` : headline;
+}
+
 /** Build an agent identity signature footer by looking up the agent from the DB. */
 export function buildAgentSignature(ctx: McpToolContext, collaborators?: HumanCollaborator[]): string {
   try {
