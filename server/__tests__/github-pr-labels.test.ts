@@ -1,105 +1,13 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import {
+  applyPrLabels,
+  ensureLabelExists,
+  inferPrLabels,
+  isOrgLabelable,
+  labelPrIfAllowed,
+} from '../github/operations';
 
-// Override mock.module leak from other test files (Bun 1.x mock leak).
-// github-tool-handlers.test.ts and polling-ack-dedup.test.ts mock
-// ../github/operations globally, replacing applyPrLabels with a no-op.
-// Re-provide real implementations so Bun.spawn spy tests work.
-mock.module('../github/operations', () => {
-  const { buildSafeGhEnv } = require('../lib/env');
-
-  function hasGhToken(): boolean {
-    return !!process.env.GH_TOKEN;
-  }
-
-  async function runGh(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-    if (!hasGhToken()) return { ok: false, stdout: '', stderr: 'GH_TOKEN not configured' };
-    try {
-      const proc = Bun.spawn(['gh', ...args], {
-        cwd: process.cwd(),
-        stdout: 'pipe',
-        stderr: 'pipe',
-        env: buildSafeGhEnv(),
-      });
-      const stdout = await new Response(proc.stdout).text();
-      const stderr = await new Response(proc.stderr).text();
-      const exitCode = await proc.exited;
-      return { ok: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() };
-    } catch (err) {
-      return { ok: false, stdout: '', stderr: err instanceof Error ? err.message : String(err) };
-    }
-  }
-
-  const COMMIT_TYPE_LABEL_MAP: Record<string, string> = {
-    feat: 'type:feature',
-    fix: 'type:bugfix',
-    chore: 'type:chore',
-    docs: 'type:docs',
-    refactor: 'type:refactor',
-    test: 'type:test',
-    perf: 'type:perf',
-    ci: 'type:ci',
-    build: 'type:build',
-  };
-
-  const TYPE_LABEL_COLORS: Record<string, string> = {
-    'type:feature': '0075ca',
-    'type:bugfix': 'd73a4a',
-    'type:chore': 'e4e669',
-    'type:docs': '0075ca',
-    'type:refactor': '7057ff',
-    'type:test': '008672',
-    'type:perf': 'fbca04',
-    'type:ci': 'c2e0c6',
-    'type:build': 'fef2c0',
-  };
-
-  const AGENT_LABEL_COLOR = '6f42c1';
-
-  function inferPrLabels(title: string, agentName?: string): string[] {
-    const labels: string[] = [];
-    const match = title.match(/^(\w+)(?:\([^)]+\))?[!]?:/);
-    if (match) {
-      const prefix = match[1].toLowerCase();
-      const typeLabel = COMMIT_TYPE_LABEL_MAP[prefix];
-      if (typeLabel) labels.push(typeLabel);
-    }
-    if (agentName) labels.push(`agent:${agentName.toLowerCase()}`);
-    return labels;
-  }
-
-  async function ensureLabelExists(repo: string, name: string, color: string): Promise<void> {
-    await runGh(['api', `repos/${repo}/labels`, '-X', 'POST', '-f', `name=${name}`, '-f', `color=${color}`]);
-  }
-
-  async function applyPrLabels(repo: string, prUrl: string, labels: string[]): Promise<void> {
-    if (labels.length === 0) return;
-    const prNumberMatch = prUrl.match(/\/pull\/(\d+)$/);
-    if (!prNumberMatch) return;
-    const prNumber = prNumberMatch[1];
-    for (const label of labels) {
-      const color = TYPE_LABEL_COLORS[label] ?? AGENT_LABEL_COLOR;
-      try {
-        await ensureLabelExists(repo, label, color);
-      } catch {
-        // ignore
-      }
-    }
-    try {
-      await runGh(['pr', 'edit', prNumber, '--repo', repo, '--add-label', labels.join(',')]);
-    } catch {
-      // ignore
-    }
-  }
-
-  return {
-    inferPrLabels,
-    ensureLabelExists,
-    applyPrLabels,
-    isGitHubConfigured: () => hasGhToken(),
-  };
-});
-
-import { applyPrLabels, ensureLabelExists, inferPrLabels } from '../github/operations';
+// ── inferPrLabels (pure function — no mocking needed) ────────────────────────
 
 describe('inferPrLabels', () => {
   test('maps feat prefix to type:feature', () => {
@@ -163,7 +71,44 @@ describe('inferPrLabels', () => {
   });
 });
 
-// ── applyPrLabels / ensureLabelExists ──────────────────────────────────────
+// ── isOrgLabelable ───────────────────────────────────────────────────────────
+
+describe('isOrgLabelable', () => {
+  test('returns true for corvidlabs (case-insensitive) with no allowedOrgs', () => {
+    expect(isOrgLabelable('CorvidLabs')).toBe(true);
+    expect(isOrgLabelable('corvidlabs')).toBe(true);
+  });
+
+  test('returns false for other orgs with no allowedOrgs', () => {
+    expect(isOrgLabelable('other-org')).toBe(false);
+  });
+
+  test('returns false for empty owner', () => {
+    expect(isOrgLabelable('')).toBe(false);
+  });
+
+  test('checks Set-based allowedOrgs', () => {
+    const orgs = new Set(['CorvidLabs', 'other-org']);
+    expect(isOrgLabelable('CorvidLabs', orgs)).toBe(true);
+    expect(isOrgLabelable('unknown', orgs)).toBe(false);
+  });
+
+  test('checks Array-based allowedOrgs', () => {
+    const orgs = ['CorvidLabs', 'other-org'];
+    expect(isOrgLabelable('CorvidLabs', orgs)).toBe(true);
+    expect(isOrgLabelable('unknown', orgs)).toBe(false);
+  });
+
+  test('returns false for empty Set', () => {
+    expect(isOrgLabelable('CorvidLabs', new Set())).toBe(false);
+  });
+
+  test('returns false for empty Array', () => {
+    expect(isOrgLabelable('CorvidLabs', [])).toBe(false);
+  });
+});
+
+// ── applyPrLabels / ensureLabelExists / labelPrIfAllowed ─────────────────────
 
 function mockSpawn() {
   return spyOn(Bun, 'spawn').mockImplementation(
@@ -227,7 +172,6 @@ describe('applyPrLabels', () => {
     await applyPrLabels('CorvidLabs/corvid-agent', 'https://github.com/CorvidLabs/corvid-agent/pull/42', [
       'type:bugfix',
     ]);
-    // 1 call for ensureLabelExists + 1 call for gh pr edit
     expect(spawnSpy).toHaveBeenCalledTimes(2);
     const editArgs = spawnSpy.mock.calls[1][0] as string[];
     expect(editArgs).toContain('pr');
@@ -240,7 +184,6 @@ describe('applyPrLabels', () => {
       'type:feature',
       'agent:jackdaw',
     ]);
-    // 2 calls for ensureLabelExists + 1 for gh pr edit
     expect(spawnSpy).toHaveBeenCalledTimes(3);
   });
 
@@ -328,5 +271,67 @@ describe('ensureLabelExists', () => {
     expect(args).toContain('repos/CorvidLabs/corvid-agent/labels');
     expect(args).toContain('name=type:feature');
     expect(args).toContain('color=0075ca');
+  });
+});
+
+describe('labelPrIfAllowed', () => {
+  let spawnSpy: ReturnType<typeof mockSpawn>;
+
+  beforeAll(() => {
+    spawnSpy = mockSpawn();
+  });
+
+  afterAll(() => {
+    spawnSpy.mockRestore();
+  });
+
+  beforeEach(() => {
+    process.env.GH_TOKEN = 'test-token';
+    spawnSpy.mockClear();
+  });
+
+  afterEach(() => {
+    if (originalGhToken) {
+      process.env.GH_TOKEN = originalGhToken;
+    } else {
+      delete process.env.GH_TOKEN;
+    }
+  });
+
+  test('labels a CorvidLabs PR with inferred labels', async () => {
+    await labelPrIfAllowed(
+      'CorvidLabs/corvid-agent',
+      'https://github.com/CorvidLabs/corvid-agent/pull/42',
+      'feat(github): auto-label PRs',
+      'Jackdaw',
+    );
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  test('skips labeling for non-allowed org', async () => {
+    await labelPrIfAllowed('other-org/repo', 'https://github.com/other-org/repo/pull/1', 'feat: thing');
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  test('skips when title produces no labels and no agent name', async () => {
+    await labelPrIfAllowed(
+      'CorvidLabs/corvid-agent',
+      'https://github.com/CorvidLabs/corvid-agent/pull/1',
+      '[Random] no conventional prefix',
+    );
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  test('uses allowedOrgs Set to gate labeling', async () => {
+    const orgs = new Set(['custom-org']);
+    await labelPrIfAllowed('custom-org/repo', 'https://github.com/custom-org/repo/pull/5', 'fix: bug', undefined, orgs);
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  test('uses allowedOrgs Array to gate labeling', async () => {
+    await labelPrIfAllowed('custom-org/repo', 'https://github.com/custom-org/repo/pull/5', 'fix: bug', undefined, [
+      'custom-org',
+    ]);
+    expect(spawnSpy.mock.calls.length).toBeGreaterThan(0);
   });
 });

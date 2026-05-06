@@ -274,13 +274,13 @@ export async function handleGitHubCreatePr(
         // Proceed without agent name
       }
       try {
-        const labels = github.inferPrLabels(args.title, prAgent?.name ?? undefined);
-        const owner = args.repo.split('/')[0] ?? '';
-        const allowedOrgs = getSchedulerAllowedOrgs();
-        const isLabelable = allowedOrgs.size > 0 ? allowedOrgs.has(owner) : owner.toLowerCase() === 'corvidlabs';
-        if (labels.length > 0 && isLabelable) {
-          await github.applyPrLabels(args.repo, result.prUrl, labels);
-        }
+        await github.labelPrIfAllowed(
+          args.repo,
+          result.prUrl,
+          args.title,
+          prAgent?.name ?? undefined,
+          getSchedulerAllowedOrgs(),
+        );
       } catch {
         // Label failure must not block PR creation
       }

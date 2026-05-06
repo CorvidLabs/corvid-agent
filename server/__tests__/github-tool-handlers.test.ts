@@ -52,7 +52,7 @@ const mockAddPrComment = mock(() => Promise.resolve({ ok: true, error: undefined
 const mockFollowUser = mock(() =>
   Promise.resolve({ ok: true, message: 'Followed testuser', error: undefined as string | undefined }),
 );
-const mockApplyPrLabels = mock(() => Promise.resolve());
+const mockLabelPrIfAllowed = mock(() => Promise.resolve());
 
 mock.module('../github/operations', () => ({
   starRepo: mockStarRepo,
@@ -68,28 +68,7 @@ mock.module('../github/operations', () => ({
   addPrComment: mockAddPrComment,
   followUser: mockFollowUser,
   isGitHubConfigured: () => true,
-  inferPrLabels: (title: string, agentName?: string) => {
-    const labels: string[] = [];
-    const match = title.match(/^(\w+)(?:\([^)]+\))?[!:]?:/);
-    if (match) {
-      const map: Record<string, string> = {
-        feat: 'type:feature',
-        fix: 'type:bugfix',
-        chore: 'type:chore',
-        docs: 'type:docs',
-        refactor: 'type:refactor',
-        test: 'type:test',
-        perf: 'type:perf',
-        ci: 'type:ci',
-        build: 'type:build',
-      };
-      const label = map[match[1].toLowerCase()];
-      if (label) labels.push(label);
-    }
-    if (agentName) labels.push(`agent:${agentName.toLowerCase()}`);
-    return labels;
-  },
-  applyPrLabels: mockApplyPrLabels,
+  labelPrIfAllowed: mockLabelPrIfAllowed,
 }));
 
 // Set env vars before importing handlers so scheduler-tool-gating reads the correct allowed orgs
@@ -168,7 +147,7 @@ beforeEach(() => {
     .mockResolvedValue({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined });
   mockAddPrComment.mockReset().mockResolvedValue({ ok: true, error: undefined });
   mockFollowUser.mockReset().mockResolvedValue({ ok: true, message: 'Followed testuser', error: undefined });
-  mockApplyPrLabels.mockReset().mockResolvedValue(undefined);
+  mockLabelPrIfAllowed.mockReset().mockResolvedValue(undefined);
 });
 
 // ── Star / Unstar ────────────────────────────────────────────────────────
@@ -375,7 +354,7 @@ describe('handleGitHubCreatePr', () => {
     expect(getText(result)).toContain('Branch not found');
   });
 
-  test('applies labels after successful PR creation on CorvidLabs repo', async () => {
+  test('calls labelPrIfAllowed after successful PR creation', async () => {
     mockCreatePr.mockResolvedValue({
       ok: true,
       prUrl: 'https://github.com/CorvidLabs/corvid-agent/pull/99',
@@ -388,14 +367,16 @@ describe('handleGitHubCreatePr', () => {
       body: 'Description',
       head: 'feat/labels',
     });
-    expect(mockApplyPrLabels).toHaveBeenCalledWith(
+    expect(mockLabelPrIfAllowed).toHaveBeenCalledWith(
       'CorvidLabs/corvid-agent',
       'https://github.com/CorvidLabs/corvid-agent/pull/99',
-      expect.arrayContaining(['type:feature']),
+      'feat(github): auto-label PRs',
+      undefined,
+      expect.anything(),
     );
   });
 
-  test('does not apply labels for non-CorvidLabs repos', async () => {
+  test('calls labelPrIfAllowed for non-CorvidLabs repos too (function handles org check)', async () => {
     mockCreatePr.mockResolvedValue({
       ok: true,
       prUrl: 'https://github.com/other-org/some-repo/pull/5',
@@ -408,7 +389,13 @@ describe('handleGitHubCreatePr', () => {
       body: 'Body',
       head: 'feat/thing',
     });
-    expect(mockApplyPrLabels).not.toHaveBeenCalled();
+    expect(mockLabelPrIfAllowed).toHaveBeenCalledWith(
+      'other-org/some-repo',
+      'https://github.com/other-org/some-repo/pull/5',
+      'feat: thing',
+      undefined,
+      expect.anything(),
+    );
   });
 
   test('label failure does not block PR creation success', async () => {
@@ -417,7 +404,7 @@ describe('handleGitHubCreatePr', () => {
       prUrl: 'https://github.com/CorvidLabs/corvid-agent/pull/99',
       error: undefined,
     });
-    mockApplyPrLabels.mockRejectedValue(new Error('GitHub API error'));
+    mockLabelPrIfAllowed.mockRejectedValue(new Error('GitHub API error'));
     const ctx = makeCtx();
     const result = await handleGitHubCreatePr(ctx, {
       repo: 'CorvidLabs/corvid-agent',

@@ -4,7 +4,7 @@ import { recordAudit } from '../db/audit';
 import { getProject } from '../db/projects';
 import { createSession } from '../db/sessions';
 import { clearWorktreeDir, getWorkTask, updateWorkTaskStatus } from '../db/work-tasks';
-import { applyPrLabels, inferPrLabels } from '../github/operations';
+import { labelPrIfAllowed } from '../github/operations';
 import { formatPrBody } from '../github/pr-body';
 import { createLogger } from '../lib/logger';
 import { removeWorktree } from '../lib/worktree';
@@ -302,17 +302,11 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
         const repoMatch = prUrl.match(/github\.com\/([^/]+\/[^/]+)\/pull\/\d+/);
         const repo = repoMatch?.[1];
         if (repo) {
-          const labels = inferPrLabels(title, agent?.name ?? undefined);
-          const owner = repo.split('/')[0] ?? '';
           const allowedOrgs = (process.env.GITHUB_ALLOWED_ORGS ?? '')
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean);
-          const isLabelable =
-            allowedOrgs.length > 0 ? allowedOrgs.includes(owner) : owner.toLowerCase() === 'corvidlabs';
-          if (labels.length > 0 && isLabelable) {
-            await applyPrLabels(repo, prUrl, labels);
-          }
+          await labelPrIfAllowed(repo, prUrl, title, agent?.name ?? undefined, allowedOrgs);
         }
       } catch {
         // Label failure must not block PR creation
