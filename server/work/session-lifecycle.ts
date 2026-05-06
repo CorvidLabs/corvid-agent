@@ -229,11 +229,13 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
       return null;
     }
 
-    // Ensure all changes are committed (agent may have left unstaged changes)
-    const statusProc = Bun.spawn(['git', 'diff', '--quiet'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+    // Ensure all changes are committed (agent may have left unstaged/untracked changes)
+    // Use `git status --porcelain` which detects ALL pending changes:
+    // untracked files, staged changes, and unstaged modifications.
+    const statusProc = Bun.spawn(['git', 'status', '--porcelain'], { cwd, stdout: 'pipe', stderr: 'pipe' });
+    const statusOutput = await new Response(statusProc.stdout).text();
     await statusProc.exited;
-    if ((await statusProc.exited) !== 0) {
-      // There are uncommitted changes — commit them
+    if (statusOutput.trim().length > 0) {
       const addProc = Bun.spawn(['git', 'add', '-A'], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await addProc.exited;
       const trailers = [coAuthor];
@@ -244,6 +246,19 @@ export async function createPrFallback(db: Database, taskId: string, sessionOutp
         : `Work task: ${task.description.slice(0, 60)}`;
       const commitProc = Bun.spawn(['git', 'commit', '-m', commitMsg], { cwd, stdout: 'pipe', stderr: 'pipe' });
       await commitProc.exited;
+    }
+
+    // Verify the branch has commits to push (avoid empty PRs)
+    const logProc = Bun.spawn(['git', 'log', '--oneline', 'HEAD', '--not', '--remotes=origin'], {
+      cwd,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const logOutput = await new Response(logProc.stdout).text();
+    await logProc.exited;
+    if (logOutput.trim().length === 0) {
+      log.warn('Fallback: branch has no commits ahead of remote — nothing to push', { taskId });
+      return null;
     }
 
     // Push the branch
