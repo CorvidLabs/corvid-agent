@@ -1,4 +1,104 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+
+// Override mock.module leak from other test files (Bun 1.x mock leak).
+// github-tool-handlers.test.ts and polling-ack-dedup.test.ts mock
+// ../github/operations globally, replacing applyPrLabels with a no-op.
+// Re-provide real implementations so Bun.spawn spy tests work.
+mock.module('../github/operations', () => {
+  const { buildSafeGhEnv } = require('../lib/env');
+
+  function hasGhToken(): boolean {
+    return !!process.env.GH_TOKEN;
+  }
+
+  async function runGh(args: string[]): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+    if (!hasGhToken()) return { ok: false, stdout: '', stderr: 'GH_TOKEN not configured' };
+    try {
+      const proc = Bun.spawn(['gh', ...args], {
+        cwd: process.cwd(),
+        stdout: 'pipe',
+        stderr: 'pipe',
+        env: buildSafeGhEnv(),
+      });
+      const stdout = await new Response(proc.stdout).text();
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+      return { ok: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() };
+    } catch (err) {
+      return { ok: false, stdout: '', stderr: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  const COMMIT_TYPE_LABEL_MAP: Record<string, string> = {
+    feat: 'type:feature',
+    fix: 'type:bugfix',
+    chore: 'type:chore',
+    docs: 'type:docs',
+    refactor: 'type:refactor',
+    test: 'type:test',
+    perf: 'type:perf',
+    ci: 'type:ci',
+    build: 'type:build',
+  };
+
+  const TYPE_LABEL_COLORS: Record<string, string> = {
+    'type:feature': '0075ca',
+    'type:bugfix': 'd73a4a',
+    'type:chore': 'e4e669',
+    'type:docs': '0075ca',
+    'type:refactor': '7057ff',
+    'type:test': '008672',
+    'type:perf': 'fbca04',
+    'type:ci': 'c2e0c6',
+    'type:build': 'fef2c0',
+  };
+
+  const AGENT_LABEL_COLOR = '6f42c1';
+
+  function inferPrLabels(title: string, agentName?: string): string[] {
+    const labels: string[] = [];
+    const match = title.match(/^(\w+)(?:\([^)]+\))?[!]?:/);
+    if (match) {
+      const prefix = match[1].toLowerCase();
+      const typeLabel = COMMIT_TYPE_LABEL_MAP[prefix];
+      if (typeLabel) labels.push(typeLabel);
+    }
+    if (agentName) labels.push(`agent:${agentName.toLowerCase()}`);
+    return labels;
+  }
+
+  async function ensureLabelExists(repo: string, name: string, color: string): Promise<void> {
+    await runGh(['api', `repos/${repo}/labels`, '-X', 'POST', '-f', `name=${name}`, '-f', `color=${color}`]);
+  }
+
+  async function applyPrLabels(repo: string, prUrl: string, labels: string[]): Promise<void> {
+    if (labels.length === 0) return;
+    const prNumberMatch = prUrl.match(/\/pull\/(\d+)$/);
+    if (!prNumberMatch) return;
+    const prNumber = prNumberMatch[1];
+    for (const label of labels) {
+      const color = TYPE_LABEL_COLORS[label] ?? AGENT_LABEL_COLOR;
+      try {
+        await ensureLabelExists(repo, label, color);
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      await runGh(['pr', 'edit', prNumber, '--repo', repo, '--add-label', labels.join(',')]);
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    inferPrLabels,
+    ensureLabelExists,
+    applyPrLabels,
+    isGitHubConfigured: () => hasGhToken(),
+  };
+});
+
 import { applyPrLabels, ensureLabelExists, inferPrLabels } from '../github/operations';
 
 describe('inferPrLabels', () => {
