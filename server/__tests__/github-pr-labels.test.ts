@@ -1,40 +1,23 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { applyPrLabels, ensureLabelExists, inferPrLabels, isOrgLabelable } from '../github/operations';
 
-// Override mock.module leak from github-tool-handlers.test.ts which replaces
-// labelPrIfAllowed with a no-op. Bun 1.x mock.module merges: only exports we
-// provide here are overridden; the rest (applyPrLabels, inferPrLabels, etc.)
-// fall through to the real module.
-mock.module('../github/operations', () => ({
-  isOrgLabelable: (owner: string, allowedOrgs?: ReadonlySet<string> | string[]): boolean => {
-    if (!owner) return false;
-    if (allowedOrgs) {
-      if (allowedOrgs instanceof Set) return allowedOrgs.size > 0 && allowedOrgs.has(owner);
-      if (Array.isArray(allowedOrgs)) return allowedOrgs.length > 0 && allowedOrgs.includes(owner);
-    }
-    return owner.toLowerCase() === 'corvidlabs';
-  },
-  labelPrIfAllowed: async (
-    repo: string,
-    prUrl: string,
-    title: string,
-    agentName?: string,
-    allowedOrgs?: ReadonlySet<string> | string[],
-  ): Promise<void> => {
-    const ops = require('../github/operations');
-    const owner = repo.split('/')[0] ?? '';
-    if (!ops.isOrgLabelable(owner, allowedOrgs)) return;
-    const labels = ops.inferPrLabels(title, agentName);
-    if (labels.length > 0) await ops.applyPrLabels(repo, prUrl, labels);
-  },
-}));
-
-import {
-  applyPrLabels,
-  ensureLabelExists,
-  inferPrLabels,
-  isOrgLabelable,
-  labelPrIfAllowed,
-} from '../github/operations';
+// Don't import labelPrIfAllowed directly — mock.module in github-tool-handlers.test.ts
+// replaces it with a no-op that leaks across test files on Linux CI.
+// Compose from un-mocked sub-functions instead; this tests the identical logic.
+async function labelPrIfAllowed(
+  repo: string,
+  prUrl: string,
+  title: string,
+  agentName?: string,
+  allowedOrgs?: ReadonlySet<string> | string[],
+): Promise<void> {
+  const owner = repo.split('/')[0] ?? '';
+  if (!isOrgLabelable(owner, allowedOrgs)) return;
+  const labels = inferPrLabels(title, agentName);
+  if (labels.length > 0) {
+    await applyPrLabels(repo, prUrl, labels);
+  }
+}
 
 // ── inferPrLabels (pure function — no mocking needed) ────────────────────────
 
