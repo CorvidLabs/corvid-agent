@@ -165,6 +165,7 @@ const algochatInitDeps: AlgoChatInitDeps = {
   healthMonitorService,
   mentionPollingService,
   flockDirectoryService,
+  bridgeService,
   browserService,
 };
 

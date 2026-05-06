@@ -10,6 +10,8 @@
 export { handleDiscoverAgent, handleInvokeRemoteAgent } from './a2a';
 // ─── AST / Code navigation ──────────────────────────────────────────────────
 export { handleCodeSymbols, handleFindReferences } from './ast';
+// ─── Bridge ─────────────────────────────────────────────────────────────────
+export { handleBridgeListSessions, handleBridgeRequest } from './bridge';
 // ─── Browser automation ────────────────────────────────────────────────────
 export { handleBrowser } from './browser';
 // ─── Contacts / identity ────────────────────────────────────────────────────

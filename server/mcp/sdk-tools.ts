@@ -4,6 +4,7 @@ import { getAgent } from '../db/agents';
 import { isToolBlockedForScheduler } from './scheduler-tool-gating';
 import { filterToolsByGuardrail, resolveToolAccessPolicy, type ToolAccessConfig } from './tool-guardrails';
 import type { McpToolContext } from './tool-handlers';
+import { handleBridgeListSessions, handleBridgeRequest } from './tool-handlers/bridge';
 import {
   handleAskOwner,
   handleBrowser,
@@ -977,6 +978,33 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
       },
       async (args) => handleLookupContact(ctx, args),
     ),
+
+    // ─── Bridge ───────────────────────────────────────────────────────
+    ...(ctx.bridgeService
+      ? [
+          tool(
+            'corvid_bridge_sessions',
+            "List active developer bridge sessions. Each session represents a developer's local machine connected via fledge-plugin-bridge.",
+            {},
+            async () => handleBridgeListSessions(ctx, {}),
+          ),
+          tool(
+            'corvid_bridge_request',
+            "Send a file or exec request through an active developer bridge session. The request is forwarded to the developer's local machine via WebSocket.",
+            {
+              session_id: z.string().describe('Bridge session ID (from corvid_bridge_sessions)'),
+              request_type: z
+                .enum(['file.read', 'file.write', 'file.list', 'exec', 'ping'])
+                .describe('Type of request'),
+              path: z.string().optional().describe('File path (for file operations)'),
+              content: z.string().optional().describe('File content (for file.write)'),
+              command: z.string().optional().describe('Shell command (for exec)'),
+              cwd: z.string().optional().describe('Working directory (for exec)'),
+            },
+            async (args) => handleBridgeRequest(ctx, args),
+          ),
+        ]
+      : []),
 
     // ─── Browser automation ─────────────────────────────────────────
     ...(ctx.browserService

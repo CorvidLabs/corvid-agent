@@ -14,6 +14,7 @@ import type { AgentDirectory } from '../algochat/agent-directory';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AgentWalletService } from '../algochat/agent-wallet';
 import type { AstParserService } from '../ast/service';
+import type { BridgeService } from '../bridge/service';
 import type { BrowserService } from '../browser/service';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import { createLogger } from '../lib/logger';
@@ -49,6 +50,7 @@ export interface McpServices {
   permissionBroker?: PermissionBroker;
   processManager?: ProcessManager;
   flockDirectoryService?: FlockDirectoryService;
+  bridgeService?: BridgeService;
   browserService?: BrowserService;
 }
 
@@ -121,6 +123,7 @@ export class McpServiceContainer {
       permissionBroker: this.services.permissionBroker,
       processManager: this.services.processManager,
       flockDirectoryService: this.services.flockDirectoryService,
+      bridgeService: this.services.bridgeService,
       browserService: this.services.browserService,
       invocationBudget: new SessionInvocationBudget(),
     };
