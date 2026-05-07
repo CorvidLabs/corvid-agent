@@ -1,6 +1,8 @@
 import type { Database } from 'bun:sqlite';
 import { execSync } from 'node:child_process';
 import { statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { AuthConfig } from '../middleware/auth';
 import { getApiKeyExpiryWarning, isApiKeyExpired } from '../middleware/auth';
 import { hasClaudeAccess } from '../providers/router';
@@ -89,7 +91,9 @@ async function checkLlmProviders(registeredProviders?: string[]): Promise<Depend
       (() => {
         try {
           const bin =
-            process.env.CURSOR_AGENT_BIN || Bun.which('cursor-agent') || `${process.env.HOME}/.local/bin/cursor-agent`;
+            process.env.CURSOR_AGENT_BIN ||
+            Bun.which('cursor-agent') ||
+            join(homedir(), '.local', 'bin', 'cursor-agent');
           return Bun.file(bin).size > 0;
         } catch {
           return false;

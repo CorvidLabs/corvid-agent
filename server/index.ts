@@ -212,19 +212,32 @@ try {
 } catch {
   log.warn(`Port ${PORT} is in use — attempting recovery`);
   try {
-    const lsof = Bun.spawnSync(['lsof', '-ti', `:${PORT}`]);
-    const pids = lsof.stdout.toString().trim().split('\n').filter(Boolean);
+    const isWindows = process.platform === 'win32';
+    const pids: string[] = [];
+    if (isWindows) {
+      const netstat = Bun.spawnSync(['cmd', '/c', `netstat -ano | findstr :${PORT} | findstr LISTENING`]);
+      for (const line of netstat.stdout.toString().trim().split('\n').filter(Boolean)) {
+        const pid = line.trim().split(/\s+/).pop();
+        if (pid) pids.push(pid);
+      }
+    } else {
+      const lsof = Bun.spawnSync(['lsof', '-ti', `:${PORT}`]);
+      pids.push(...lsof.stdout.toString().trim().split('\n').filter(Boolean));
+    }
     const myPid = process.pid.toString();
     for (const pid of pids) {
       if (pid === myPid) continue;
       log.warn(`Killing stale process ${pid} on port ${PORT}`);
       try {
-        Bun.spawnSync(['kill', '-TERM', pid], { stdout: 'ignore', stderr: 'ignore' });
+        if (isWindows) {
+          Bun.spawnSync(['taskkill', '/F', '/PID', pid], { stdout: 'ignore', stderr: 'ignore' });
+        } else {
+          Bun.spawnSync(['kill', '-TERM', pid], { stdout: 'ignore', stderr: 'ignore' });
+        }
       } catch {
         /* already dead */
       }
     }
-    // Wait for port to free up
     Bun.sleepSync(1500);
   } catch (err) {
     log.error('Port recovery failed', { error: err instanceof Error ? err.message : String(err) });
@@ -754,10 +767,15 @@ function logShutdownDiagnostics(signal: string): void {
   const activeCount = processManager.getActiveSessionIds().length;
   let parentInfo = `ppid=${process.ppid}`;
   try {
-    // Try to identify the parent process that may have sent the signal
-    const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
-    const parentName = result.stdout.toString().trim();
-    if (parentName) parentInfo += ` (${parentName})`;
+    if (process.platform === 'win32') {
+      const result = Bun.spawnSync(['cmd', '/c', `tasklist /FI "PID eq ${process.ppid}" /FO CSV /NH`]);
+      const name = result.stdout.toString().trim().split(',')[0]?.replace(/"/g, '');
+      if (name) parentInfo += ` (${name})`;
+    } else {
+      const result = Bun.spawnSync(['ps', '-p', String(process.ppid), '-o', 'comm=']);
+      const parentName = result.stdout.toString().trim();
+      if (parentName) parentInfo += ` (${parentName})`;
+    }
   } catch {
     /* ignore */
   }

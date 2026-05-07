@@ -16,6 +16,8 @@
  *   --approve-mcps       auto-approve MCP servers
  */
 
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { Agent, Project, Session } from '../../shared/types';
 import { createLogger } from '../lib/logger';
 import type { SdkProcess } from './sdk-process';
@@ -23,7 +25,7 @@ import type { ClaudeStreamEvent, DirectProcessMetrics, SessionTurnMetricsEvent }
 
 const log = createLogger('CursorProcess');
 
-const DEFAULT_CURSOR_BIN = `${process.env.HOME}/.local/bin/cursor-agent`;
+const DEFAULT_CURSOR_BIN = join(homedir(), '.local', 'bin', 'cursor-agent');
 const CURSOR_BIN = process.env.CURSOR_AGENT_BIN || Bun.which('cursor-agent') || DEFAULT_CURSOR_BIN;
 
 export interface CursorProcessOptions {

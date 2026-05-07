@@ -343,7 +343,7 @@ export async function cleanupChatWorktree(
 
   // Clean up chat worktrees
   const session = getSession(deps.db, sessionId);
-  if (!session?.workDir?.includes('/chat-')) return 'skipped';
+  if (!session?.workDir || !/[\\/]chat-/.test(session.workDir)) return 'skipped';
 
   const project = session.projectId ? getProject(deps.db, session.projectId) : null;
   if (!project?.workingDir) return 'skipped';

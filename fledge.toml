@@ -11,6 +11,7 @@ lint-fix = "bun run lint:fix"
 format = "bun run format:fix"
 lint-sql = "bun run lint:sql"
 security-scan = "bun run security:scan"
+cross-platform-check = "bun run scripts/check-cross-platform.ts"
 
 [tasks.dev]
 cmd = "bun --watch server/index.ts"
@@ -55,7 +56,7 @@ steps = [
 [lanes.audit]
 description = "Full quality and security audit"
 fail_fast = false
-steps = ["lint", "typecheck", "test", "spec-check", "lint-sql", "security-scan", "openapi-validate"]
+steps = ["lint", "typecheck", "test", "spec-check", "lint-sql", "security-scan", "openapi-validate", "cross-platform-check"]
 
 [lanes.fix]
 description = "Auto-fix lint and formatting issues"

@@ -2457,7 +2457,7 @@ export class ProcessManager {
 
     // Clean up chat worktrees
     const session = getSession(this.db, sessionId);
-    if (!session?.workDir?.includes('/chat-')) return;
+    if (!session?.workDir || !/[\\/]chat-/.test(session.workDir)) return;
 
     const project = session.projectId ? getProject(this.db, session.projectId) : null;
     if (!project?.workingDir) return;

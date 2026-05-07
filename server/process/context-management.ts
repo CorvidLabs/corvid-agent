@@ -319,7 +319,7 @@ function extractMentionedFilePaths(messages: Array<{ role: string; content: stri
       let match: RegExpExecArray | null;
       while ((match = pattern.exec(msg.content)) !== null) {
         const p = match[1];
-        if (p.includes('/') && !p.startsWith('http') && !p.startsWith('//')) {
+        if ((p.includes('/') || p.includes('\\')) && !p.startsWith('http') && !p.startsWith('//')) {
           paths.add(p);
         }
       }
