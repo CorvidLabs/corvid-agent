@@ -15,6 +15,7 @@ files:
   - server/mcp/tool-handlers/workflow.ts
   - server/mcp/tool-handlers/search.ts
   - server/mcp/tool-handlers/github.ts
+  - server/mcp/tool-handlers/github-issue-body.ts
   - server/mcp/tool-handlers/a2a.ts
   - server/mcp/tool-handlers/owner.ts
   - server/mcp/tool-handlers/notifications.ts
@@ -88,6 +89,15 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `HumanCollaborator` | interface | `{ displayName, githubUsername? }` | Represents a human collaborator for attribution in PRs, issues, and commits |
 | `inferCommitType` | `(branchName: string, description: string)` | `CommitType` | Infer conventional commit type from branch name and description |
 | `formatCommitMessage` | `(description: string, branchName: string, agent: { name, model } \| null \| undefined, collaborators?)` | `string` | Format a conventional commit message with type prefix and trailers |
+
+### Exported Types and Functions (from github-issue-body.ts)
+
+| Symbol | Parameters | Returns | Description |
+|--------|-----------|---------|-------------|
+| `IssueType` | — | `'bug' \| 'feature' \| 'unknown'` | Issue type inferred from title/body keyword scanning |
+| `FormatIssueBodyOptions` | — | `{ issueType?: IssueType }` | Options for `formatIssueBody` with optional type override |
+| `detectIssueType` | `(title: string, body: string)` | `IssueType` | Infer issue type by scanning title keywords then first 500 chars of body |
+| `formatIssueBody` | `(title: string, rawBody: string, options?: FormatIssueBodyOptions)` | `string` | Apply structured template (bug/feature) to a raw issue body; passes through if body already has `##` headers or type is unknown |
 
 ### Exported Functions
 
@@ -278,3 +288,4 @@ Internal constants (not env-configurable):
 | 2026-04-13 | corvid-agent | Added cross-channel-guard.ts: runtime enforcement for TODO(#1067), advisory logging for channel-bound sessions |
 | 2026-05-01 | corvid-agent | Documented handleEscalateWorkTask export from work.ts (#2215) |
 | 2026-05-06 | corvid-agent | Added bridge tool handlers: handleBridgeListSessions, handleBridgeRequest (#2287) |
+| 2026-05-06 | corvid-agent | Added github-issue-body.ts: formatIssueBody/detectIssueType helpers (#2273) |
