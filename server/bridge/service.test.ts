@@ -141,7 +141,12 @@ describe('BridgeService', () => {
   test('rejects content exceeding max size', async () => {
     const ws = makeMockWs();
     service.registerSession('s-cl', 'test', 'p', fullCaps, ws);
-    const req: BridgeRequest = { id: 'r6', type: 'file.write', path: '/foo', content: 'x'.repeat(MAX_CONTENT_LENGTH + 1) };
+    const req: BridgeRequest = {
+      id: 'r6',
+      type: 'file.write',
+      path: '/foo',
+      content: 'x'.repeat(MAX_CONTENT_LENGTH + 1),
+    };
     await expect(service.sendRequest('s-cl', req)).rejects.toThrow(/content exceeds/i);
   });
 

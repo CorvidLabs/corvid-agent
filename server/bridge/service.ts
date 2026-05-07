@@ -233,7 +233,9 @@ export class BridgeService {
     }
     bucket.count++;
     if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
-      throw new Error(`Rate limit exceeded: max ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`);
+      throw new Error(
+        `Rate limit exceeded: max ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`,
+      );
     }
   }
 
@@ -245,7 +247,9 @@ export class BridgeService {
         log.warn(`Reaping idle bridge session: ${id} (idle ${Math.round(idle / 1000)}s)`);
         try {
           session.ws.close(4003, 'Idle timeout');
-        } catch { /* already closed */ }
+        } catch {
+          /* already closed */
+        }
         this.removeSession(id);
       }
     }

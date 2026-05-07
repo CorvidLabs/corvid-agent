@@ -12,6 +12,7 @@ import {
   updateMemoryTxid,
 } from '../../db/agent-memories';
 import { encryptMemoryContent } from '../../lib/crypto';
+import type { FledgeClient } from '../../lib/fledge-client';
 import { createLogger } from '../../lib/logger';
 import type { Arc69Context } from '../../memory/arc69-store';
 import type { McpToolContext } from './types';
@@ -73,11 +74,34 @@ async function searchOnChainFallback(ctx: McpToolContext, search: string): Promi
   }
 }
 
+/** Try fledge memory save, returning true if it handled the operation. */
+async function tryFledgeSave(fledge: FledgeClient | undefined, key: string, content: string): Promise<string | null> {
+  if (!fledge) return null;
+  try {
+    const result = await fledge.memory('save', { key, value: content });
+    const tier = (result.tier as string) ?? 'ephemeral';
+    return `Memory saved with key "${key}" (${tier}, via fledge). Use corvid_promote_memory to promote to on-chain storage.`;
+  } catch (err) {
+    log.debug('fledge memory save failed, falling back to internal', {
+      key,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
 export async function handleSaveMemory(
   ctx: McpToolContext,
   args: { key: string; content: string },
 ): Promise<CallToolResult> {
   try {
+    const fledgeResult = await tryFledgeSave(ctx.fledgeClient, args.key, args.content);
+    if (fledgeResult) {
+      // Also save locally so recall/search/sync work without round-tripping to fledge
+      saveMemory(ctx.db, { agentId: ctx.agentId, key: args.key, content: args.content });
+      return textResult(fledgeResult);
+    }
+
     saveMemory(ctx.db, {
       agentId: ctx.agentId,
       key: args.key,
@@ -106,6 +130,29 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
       return textResult(`Memory "${args.key}" is already on-chain (ASA: ${memory.asaId}).`);
     }
 
+    // Try fledge first
+    if (ctx.fledgeClient) {
+      try {
+        const result = await ctx.fledgeClient.memory('promote', { key: args.key, tier: 'mutable' });
+        const asaId = result.assetId ?? result.asaId;
+        const txid = result.txid as string;
+        if (txid) updateMemoryTxid(ctx.db, memory.id, txid);
+        if (asaId) updateMemoryAsaId(ctx.db, memory.id, Number(asaId));
+        updateMemoryStatus(ctx.db, memory.id, 'confirmed');
+        return textResult(
+          `Memory "${args.key}" promoted to on-chain storage via fledge.` +
+            (asaId ? ` ASA: ${asaId}` : '') +
+            (txid ? ` Txid: ${txid}` : ''),
+        );
+      } catch (err) {
+        log.debug('fledge memory promote failed, falling back to internal', {
+          key: args.key,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Fallback: internal implementation
     const isLocalnet = ctx.network === 'localnet' || !ctx.network;
 
     if (isLocalnet) {
@@ -170,7 +217,7 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
                 }),
               );
             } catch {
-              // DB may be closed during test teardown — safe to ignore
+              // DB may be closed during test teardown
             }
           }
         })
@@ -182,7 +229,7 @@ export async function handlePromoteMemory(ctx: McpToolContext, args: { key: stri
           try {
             updateMemoryStatus(ctx.db, memory.id, 'failed');
           } catch {
-            // DB may be closed during test teardown — safe to ignore
+            // DB may be closed during test teardown
           }
         });
 
@@ -201,9 +248,23 @@ export async function handleRecallMemory(
 ): Promise<CallToolResult> {
   try {
     if (args.key) {
+      // Try fledge recall first for on-chain data
+      if (ctx.fledgeClient) {
+        try {
+          const result = await ctx.fledgeClient.memory('recall', { key: args.key });
+          if (result.error !== 'not_found' && result.value) {
+            const tier = (result.tier as string) ?? 'unknown';
+            const txid = result.txid as string;
+            const chainTag = txid ? ` (on-chain, txid: ${txid})` : ` (${tier})`;
+            return textResult(`[${args.key}] ${result.value}${chainTag} (via fledge)`);
+          }
+        } catch {
+          // Fall through to internal
+        }
+      }
+
       const memory = recallMemory(ctx.db, ctx.agentId, args.key);
       if (!memory) {
-        // Fallback: search on-chain for the key
         const onChainResults = await searchOnChainFallback(ctx, args.key);
         if (onChainResults && onChainResults.length > 0) {
           const found = onChainResults[0];
@@ -214,7 +275,6 @@ export async function handleRecallMemory(
         return textResult(`No memory found with key "${args.key}".`);
       }
 
-      // ARC-69 memories show ASA ID instead of raw txid
       let chainTag: string;
       if (memory.asaId) {
         chainTag = `(on-chain, ASA: ${memory.asaId})`;
@@ -231,7 +291,6 @@ export async function handleRecallMemory(
     if (args.query) {
       const memories = searchMemories(ctx.db, ctx.agentId, args.query);
       if (memories.length === 0) {
-        // Fallback: search on-chain
         const onChainResults = await searchOnChainFallback(ctx, args.query);
         if (onChainResults && onChainResults.length > 0) {
           const lines = onChainResults.map(
@@ -291,6 +350,29 @@ export async function handleDeleteMemory(
       return errorResult(`No memory found with key "${args.key}".`);
     }
 
+    // Try fledge first
+    if (ctx.fledgeClient && memory.asaId) {
+      try {
+        const result = await ctx.fledgeClient.memory('delete', { key: args.key });
+        const mode = (args.mode === 'hard' ? 'hard' : 'soft') as 'soft' | 'hard';
+        if (mode === 'hard') {
+          deleteMemoryRow(ctx.db, ctx.agentId, args.key);
+        } else {
+          archiveMemory(ctx.db, ctx.agentId, args.key);
+        }
+        const modeLabel = mode === 'hard' ? 'permanently deleted' : 'soft-deleted (archived)';
+        return textResult(
+          `Memory "${args.key}" ${modeLabel} via fledge. (ASA: ${memory.asaId}${result.txid ? `, txid: ${result.txid}` : ''})`,
+        );
+      } catch (err) {
+        log.debug('fledge memory delete failed, falling back to internal', {
+          key: args.key,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Fallback: internal
     if (!memory.asaId) {
       return errorResult(
         `Memory "${args.key}" is a permanent (plain transaction) memory and cannot be deleted. ` +
@@ -328,6 +410,50 @@ export async function handleReadOnChainMemories(
   args: { search?: string; limit?: number },
 ): Promise<CallToolResult> {
   try {
+    // Try fledge first for on-chain listing
+    if (ctx.fledgeClient) {
+      try {
+        const result = await ctx.fledgeClient.memory('list', {});
+        const memories = (result.memories ?? result.items ?? []) as Array<{
+          key: string;
+          value?: string;
+          content?: string;
+          txid?: string;
+          assetId?: number;
+          created?: string;
+        }>;
+
+        let filtered = memories;
+        if (args.search) {
+          const s = args.search.toLowerCase();
+          filtered = memories.filter(
+            (m) => m.key.toLowerCase().includes(s) || (m.value ?? m.content ?? '').toLowerCase().includes(s),
+          );
+        }
+
+        if (filtered.length === 0) {
+          const msg = args.search
+            ? `No on-chain memories found matching "${args.search}" (via fledge).`
+            : 'No on-chain memories found (via fledge).';
+          return textResult(msg);
+        }
+
+        const lines = filtered.map((m) => {
+          const id = m.assetId ? `ASA ${m.assetId}` : m.txid ? `txid: ${m.txid}` : 'unknown';
+          return `[${m.key}] ${m.value ?? m.content ?? ''}\n  (${id}${m.created ? ` | ${m.created}` : ''})`;
+        });
+
+        return textResult(
+          `Found ${filtered.length} on-chain memor${filtered.length === 1 ? 'y' : 'ies'} (via fledge):\n\n${lines.join('\n\n')}`,
+        );
+      } catch (err) {
+        log.debug('fledge memory list failed, falling back to internal', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Fallback: internal
     const allMemories: Array<{
       key: string;
       content: string;
@@ -337,7 +463,6 @@ export async function handleReadOnChainMemories(
       source: string;
     }> = [];
 
-    // 1. Read ARC-69 ASA memories (localnet) — this is the primary storage format
     const isLocalnet = ctx.network === 'localnet' || !ctx.network;
     if (isLocalnet) {
       try {
@@ -362,13 +487,11 @@ export async function handleReadOnChainMemories(
       }
     }
 
-    // 2. Read plain transaction memories
     const plainMemories = await ctx.agentMessenger.readOnChainMemories(ctx.agentId, ctx.serverMnemonic, ctx.network, {
       limit: args.limit ?? 50,
       search: args.search,
     });
 
-    // Deduplicate: skip plain txn memories whose key already appeared in ARC-69 results
     const arc69Keys = new Set(allMemories.map((m) => m.key));
     for (const m of plainMemories) {
       if (!arc69Keys.has(m.key)) {
@@ -418,7 +541,6 @@ export async function handleSyncOnChainMemories(
             const existing = recallMemory(ctx.db, ctx.agentId, m.key);
             if (existing) {
               if (!existing.asaId) {
-                // Local row exists but doesn't know about its ASA — update it
                 updateMemoryAsaId(ctx.db, existing.id, m.asaId);
                 updateMemoryTxid(ctx.db, existing.id, m.txid);
                 updateMemoryStatus(ctx.db, existing.id, 'confirmed');
@@ -427,7 +549,6 @@ export async function handleSyncOnChainMemories(
                 skipped++;
               }
             } else {
-              // Restore from chain to SQLite
               const saved = saveMemory(ctx.db, {
                 agentId: ctx.agentId,
                 key: m.key,

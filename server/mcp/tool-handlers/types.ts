@@ -9,6 +9,7 @@ import type { AstParserService } from '../../ast/service';
 import type { BridgeService } from '../../bridge/service';
 import type { BrowserService } from '../../browser/service';
 import type { FlockDirectoryService } from '../../flock-directory/service';
+import type { FledgeClient } from '../../lib/fledge-client';
 import type { QuestionDispatcher } from '../../notifications/question-dispatcher';
 import type { NotificationService } from '../../notifications/service';
 import type { PermissionBroker } from '../../permissions/broker';
@@ -88,6 +89,8 @@ export interface McpToolContext {
   toolAccessConfig?: ToolAccessConfig;
   /** Per-session rate limiter for agent-to-agent messaging (closes #1054). */
   messageRateLimiter?: SessionMessageRateLimiter;
+  /** Fledge CLI client for delegating to fledge plugins (memory, sql, localnet, algochat). */
+  fledgeClient?: FledgeClient;
 }
 
 export function textResult(text: string): CallToolResult {

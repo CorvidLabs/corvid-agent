@@ -20,6 +20,7 @@ import { publishToTenant } from '../events/broadcasting';
 import { createFlockClient } from '../flock-directory/deploy';
 import type { FlockDirectoryService } from '../flock-directory/service';
 import type { HealthMonitorService } from '../health/monitor';
+import { FledgeClient } from '../lib/fledge-client';
 import { assertProductionReady, createKeyProvider, detectPlaintextKeyConfig } from '../lib/key-provider';
 import { createLogger } from '../lib/logger';
 import type { ShutdownCoordinator } from '../lib/shutdown-coordinator';
@@ -215,6 +216,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     flockDirectoryService,
     bridgeService,
     browserService,
+    fledgeClient: new FledgeClient(),
   });
 
   // Forward AlgoChat events to WebSocket clients
