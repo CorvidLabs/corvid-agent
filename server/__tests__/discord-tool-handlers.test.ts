@@ -9,7 +9,7 @@ import { mockDiscordRest } from './helpers/mock-discord-rest';
 // Use spyOn instead of mock.module to avoid polluting the global module cache,
 // which breaks sendDiscordMessage in other test files (e.g. discord-bridge).
 const mockSendMessageWithFiles = mock((..._args: unknown[]) => Promise.resolve('mock-msg-1' as string | null));
-const mockSendDiscordMessage = mock((..._args: unknown[]) => Promise.resolve());
+const mockSendDiscordMessage = mock((..._args: unknown[]) => Promise.resolve(['mock-msg-id-1']));
 
 let sendMessageWithFilesSpy: ReturnType<typeof spyOn>;
 let sendDiscordMessageSpy: ReturnType<typeof spyOn>;
@@ -45,7 +45,7 @@ beforeEach(() => {
   );
   // Reset mocks to default success behavior
   mockSendMessageWithFiles.mockImplementation((..._args: unknown[]) => Promise.resolve('mock-msg-1'));
-  mockSendDiscordMessage.mockImplementation((..._args: unknown[]) => Promise.resolve());
+  mockSendDiscordMessage.mockImplementation((..._args: unknown[]) => Promise.resolve(['mock-msg-id-1']));
 });
 
 afterEach(() => {
@@ -107,6 +107,28 @@ describe('handleDiscordSendMessage', () => {
   it('returns error when Discord API fails', async () => {
     // sendDiscordMessage swallows errors internally (try/catch in embeds.ts),
     // so even when the underlying REST call fails, the handler still succeeds.
+    const ctx = createMockContext();
+    const result = await handleDiscordSendMessage(ctx, {
+      channel_id: '123456',
+      message: 'Hello',
+    });
+    expect(result.isError).toBeUndefined();
+  });
+
+  it('calls trackDiscordBotMessage for each sent message ID', async () => {
+    mockSendDiscordMessage.mockImplementation((..._args: unknown[]) => Promise.resolve(['msg-001', 'msg-002']));
+    const tracker = mock((_id: string, _ch: string) => {});
+    const ctx = createMockContext({ trackDiscordBotMessage: tracker });
+    await handleDiscordSendMessage(ctx, {
+      channel_id: '999',
+      message: 'Hello world',
+    });
+    expect(tracker).toHaveBeenCalledTimes(2);
+    expect(tracker).toHaveBeenCalledWith('msg-001', '999');
+    expect(tracker).toHaveBeenCalledWith('msg-002', '999');
+  });
+
+  it('does not fail when trackDiscordBotMessage is not set', async () => {
     const ctx = createMockContext();
     const result = await handleDiscordSendMessage(ctx, {
       channel_id: '123456',

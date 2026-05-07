@@ -595,7 +595,22 @@ async function handleMentionReply(
     withAuthorContext(cleanText, authorId, authorUsername, channelId),
     attachments,
   );
-  ctx.processManager.startProcess(session, textWithUrls, { skipSkillPrompt: true });
+  const mentionInfo: MentionSessionInfo = {
+    sessionId: session.id,
+    agentName,
+    agentModel,
+    projectName: projectNameForFooter,
+    displayColor: agentDisplayColor,
+    displayIcon: agentDisplayIcon,
+    avatarUrl: agentAvatarUrl,
+    channelId,
+  };
+  ctx.processManager.startProcess(session, textWithUrls, {
+    skipSkillPrompt: true,
+    trackDiscordBotMessage: (botMsgId, botMsgChannelId) => {
+      trackMentionSession(ctx.db, ctx.mentionSessions, botMsgId, { ...mentionInfo, channelId: botMsgChannelId });
+    },
+  });
   ctx.processManager.setKeepAliveTtl(session.id, MENTION_KEEP_ALIVE_TTL_MS);
 
   // Record inbound Discord message as a short-term observation for context retention
@@ -715,7 +730,21 @@ async function handleMentionReplyResume(
     // since the last exchange. New mentions intentionally skip this for a clean slate.
     const channelContext = buildChannelContext(ctx.db, channelId);
     const resumeTextWithContext = channelContext ? `${channelContext}\n\n${resumeText}` : resumeText;
-    ctx.processManager.resumeProcess(session, resumeTextWithContext);
+    ctx.processManager.resumeProcess(session, resumeTextWithContext, {
+      trackDiscordBotMessage: (botMsgId, botMsgChannelId) => {
+        trackMentionSession(ctx.db, ctx.mentionSessions, botMsgId, {
+          sessionId,
+          agentName,
+          agentModel,
+          projectName,
+          displayColor,
+          displayIcon,
+          avatarUrl,
+          channelId: botMsgChannelId,
+          conversationOnly,
+        });
+      },
+    });
     ctx.processManager.setKeepAliveTtl(sessionId, MENTION_KEEP_ALIVE_TTL_MS);
 
     // If resumeProcess failed (e.g. death loop reset, spawn error), fall back to a new session

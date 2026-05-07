@@ -347,6 +347,8 @@ export class ProcessManager {
       keepAliveTtlMs?: number;
       /** Skip skill bundle prompt loading for lightweight sessions (e.g. mention sessions). */
       skipSkillPrompt?: boolean;
+      /** Track bot-sent Discord message IDs so replies route back to this session. */
+      trackDiscordBotMessage?: (messageId: string, channelId: string) => void;
     },
   ): void {
     if (this.startingSession.has(session.id)) {
@@ -656,6 +658,7 @@ export class ProcessManager {
               schedulerActionType,
             );
             if (!ctx) return undefined;
+            if (options?.trackDiscordBotMessage) ctx.trackDiscordBotMessage = options.trackDiscordBotMessage;
             const pluginSdkTools = this.pluginRegistry
               ? buildPluginSdkTools(this.pluginRegistry, session.agentId, session.id)
               : [];
@@ -969,7 +972,14 @@ export class ProcessManager {
     });
   }
 
-  resumeProcess(session: Session, prompt?: string): void {
+  resumeProcess(
+    session: Session,
+    prompt?: string,
+    options?: {
+      /** Track bot-sent Discord message IDs so replies route back to this session. */
+      trackDiscordBotMessage?: (messageId: string, channelId: string) => void;
+    },
+  ): void {
     // Clear stale startingSession entries — if the session isn't actually in the
     // processes map, any leftover startingSession guard from a failed spawn is stale.
     if (this.startingSession.has(session.id) && !this.processes.has(session.id)) {
@@ -1212,14 +1222,18 @@ export class ProcessManager {
         // For restricted /message sessions, override permissions to only expose memory tools
         const effectivePermissions = resumeMcpToolAllowList ?? resumeConfig.resolvedToolPermissions;
         const mcpToolContext = session.agentId
-          ? this.buildMcpContext(
-              session.agentId,
-              session.source,
-              session.id,
-              undefined,
-              undefined,
-              effectivePermissions,
-            )
+          ? (() => {
+              const ctx = this.buildMcpContext(
+                session.agentId,
+                session.source,
+                session.id,
+                undefined,
+                undefined,
+                effectivePermissions,
+              );
+              if (ctx && options?.trackDiscordBotMessage) ctx.trackDiscordBotMessage = options.trackDiscordBotMessage;
+              return ctx;
+            })()
           : null;
         const councilModelResume = process.env.COUNCIL_MODEL;
         const modelOverrideResume =
@@ -1260,6 +1274,7 @@ export class ProcessManager {
                   effectivePermissions,
                 );
                 if (!ctx) return undefined;
+                if (options?.trackDiscordBotMessage) ctx.trackDiscordBotMessage = options.trackDiscordBotMessage;
                 const pluginSdkTools = this.pluginRegistry
                   ? buildPluginSdkTools(this.pluginRegistry, session.agentId, session.id)
                   : [];
