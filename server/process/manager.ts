@@ -525,6 +525,7 @@ export class ProcessManager {
         options?.toolAllowList,
         options?.mcpToolAllowList,
         options?.skipSkillPrompt,
+        options?.trackDiscordBotMessage,
       );
     } else {
       this.startSdkProcessWrapped(
@@ -539,6 +540,7 @@ export class ProcessManager {
         options?.toolAllowList,
         options?.mcpToolAllowList,
         options?.skipSkillPrompt,
+        options?.trackDiscordBotMessage,
       );
     }
   }
@@ -612,6 +614,7 @@ export class ProcessManager {
         options?.toolAllowList,
         options?.mcpToolAllowList,
         options?.skipSkillPrompt,
+        options?.trackDiscordBotMessage,
       );
     }
   }
@@ -628,6 +631,7 @@ export class ProcessManager {
     toolAllowList?: string[],
     mcpToolAllowList?: string[],
     skipSkillPrompt?: boolean,
+    trackDiscordBotMessage?: (messageId: string, channelId: string) => void,
   ): void {
     const effectiveProject = session.workDir ? { ...project, workingDir: session.workDir } : project;
 
@@ -660,7 +664,7 @@ export class ProcessManager {
               schedulerActionType,
             );
             if (!ctx) return undefined;
-            if (options?.trackDiscordBotMessage) ctx.trackDiscordBotMessage = options.trackDiscordBotMessage;
+            if (trackDiscordBotMessage) ctx.trackDiscordBotMessage = trackDiscordBotMessage;
             const pluginSdkTools = this.pluginRegistry
               ? buildPluginSdkTools(this.pluginRegistry, session.agentId, session.id)
               : [];
