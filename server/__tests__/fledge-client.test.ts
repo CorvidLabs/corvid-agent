@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { FledgeClient, FledgeError } from '../lib/fledge-client';
 
-// We mock Bun.spawn at the module boundary to avoid actually spawning fledge
 let mockSpawnResult: {
   exitCode: number;
   stdout: string;
