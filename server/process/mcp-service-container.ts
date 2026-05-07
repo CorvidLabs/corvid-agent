@@ -17,6 +17,7 @@ import type { AstParserService } from '../ast/service';
 import type { BridgeService } from '../bridge/service';
 import type { BrowserService } from '../browser/service';
 import type { FlockDirectoryService } from '../flock-directory/service';
+import type { FledgeClient } from '../lib/fledge-client';
 import { createLogger } from '../lib/logger';
 import type { McpToolContext } from '../mcp/tool-handlers';
 import type { QuestionDispatcher } from '../notifications/question-dispatcher';
@@ -52,6 +53,7 @@ export interface McpServices {
   flockDirectoryService?: FlockDirectoryService;
   bridgeService?: BridgeService;
   browserService?: BrowserService;
+  fledgeClient?: FledgeClient;
 }
 
 export interface BuildContextOptions {
@@ -126,6 +128,7 @@ export class McpServiceContainer {
       bridgeService: this.services.bridgeService,
       browserService: this.services.browserService,
       invocationBudget: new SessionInvocationBudget(),
+      fledgeClient: this.services.fledgeClient,
     };
   }
 }

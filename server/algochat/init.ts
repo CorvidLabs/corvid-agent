@@ -13,6 +13,7 @@ import type { AstParserService } from '../ast/service';
 import type { UsageMeter } from '../billing/meter';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import type { AlgoChatState } from '../bootstrap';
+import { FledgeClient } from '../lib/fledge-client';
 import type { BridgeService } from '../bridge/service';
 import type { BrowserService } from '../browser/service';
 import type { MemorySyncService } from '../db/memory-sync';
@@ -215,6 +216,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     flockDirectoryService,
     bridgeService,
     browserService,
+    fledgeClient: new FledgeClient(),
   });
 
   // Forward AlgoChat events to WebSocket clients
