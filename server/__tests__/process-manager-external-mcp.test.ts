@@ -39,7 +39,7 @@ describe('External MCP config loading parity (spec invariant #15)', () => {
 
   test('resumeProcess loads external MCP configs for SDK path', () => {
     // Extract the resumeProcess method body (large method, need 15000 chars)
-    const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(session: Session');
+    const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(\n    session: Session');
     expect(startIdx).toBeGreaterThan(-1);
 
     const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 15000);
@@ -61,7 +61,7 @@ describe('External MCP config loading parity (spec invariant #15)', () => {
   });
 
   test('resumeProcess loads external MCP configs for direct path', () => {
-    const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(session: Session');
+    const startIdx = MANAGER_SOURCE.indexOf('resumeProcess(\n    session: Session');
     expect(startIdx).toBeGreaterThan(-1);
 
     const methodBody = MANAGER_SOURCE.slice(startIdx, startIdx + 15000);
