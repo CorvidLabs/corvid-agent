@@ -106,6 +106,10 @@ fledge run spec-check                 # Spec invariant verification
 - `Bun.spawn` over `child_process` for subprocesses
 - Typed error enums with `Sendable` conformance patterns
 
+## Fledge First
+
+Before reaching for browser tools, web searches, or manual approaches, **always check `fledge plugins list`** to see if a fledge plugin can handle the task. If a plugin exists for what you need, use it. Fledge plugins are faster, cleaner, and produce better results than manual alternatives.
+
 ## Skills Reference
 
 Detailed guides for every workflow and tool live in `skills/`. Key skills:
