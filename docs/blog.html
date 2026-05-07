@@ -800,6 +800,87 @@
   <main id="main-content" class="container">
     <div class="posts-grid" id="posts-container">
 
+      <!-- Post: v0.66 — Keep-Alive Sessions, Bridge Endpoint, and Workflow Automation -->
+      <article class="post post--full" id="v066-keep-alive"
+               data-tags="release,engineering" data-date="2026-05-06"
+               data-search="v0.66 keep-alive warm turn bridge endpoint fledge plugins conventional commits auto-label PR template formatIssueBody mention reliability Discord Telegram AlgoChat CVE security session lifecycle state machine TTL context">
+        <div class="post-meta">
+          <time datetime="2026-05-06">2026-05-06</time>
+          <span class="post-tag tag-release">RELEASE</span>
+          <span class="post-tag tag-engineering">ENGINEERING</span>
+        </div>
+        <h2><a href="#v066-keep-alive">v0.66 &mdash; Keep-Alive Sessions, Bridge Endpoint, and Workflow Automation</a></h2>
+
+        <p><strong>TL;DR:</strong> 42 commits, 20 features, 27 fixes. Sessions no longer die between messages &mdash; keep-alive landed across all three bridges. A new server-side bridge endpoint enables cross-service communication. GitHub workflow got automated: conventional commits, auto-labeled PRs, and structured issue templates. Fledge plugins are now native agent tools. Discord @mentions got a reliability overhaul.</p>
+
+        <h3>Keep-Alive Sessions: The End of &ldquo;Who Are You Again?&rdquo;</h3>
+        <p>This was the headline feature &mdash; 11 commits across three phases. Previously, every time a message arrived after a session timed out, the agent started cold: no context, no memory of the conversation, full initialization overhead. Keep-alive changes that fundamentally.</p>
+        <ul>
+          <li><strong>Phase 1:</strong> Spec-first design of the keep-alive lifecycle, documenting the state machine before writing a line of implementation.</li>
+          <li><strong>Phase 2:</strong> The state machine itself &mdash; sessions transition between <code>active</code>, <code>waiting</code>, and <code>warm</code> states instead of dying on idle. A waiting session holds its process and context window open, ready for the next message without cold-start overhead.</li>
+          <li><strong>Phase 3:</strong> Per-session flags, coexistence with non-keep-alive sessions, and dashboard badges showing warm status. You can see which sessions are alive at a glance.</li>
+        </ul>
+        <p>Then we wired it into every bridge:</p>
+        <ul>
+          <li><strong>Discord:</strong> Keep-alive enabled by default. Active duration tracking and TTL countdown visible in embed footers. Sessions survive between messages.</li>
+          <li><strong>Telegram:</strong> Warm-turn support added, same lifecycle as Discord.</li>
+          <li><strong>AlgoChat:</strong> On-chain messaging sessions now persist across turns, so agent-to-agent conversations maintain context without re-initialization.</li>
+        </ul>
+        <p>The fixes that followed tell the real story: persistent message queues to prevent stdin close, context token updates after warm turns, proper keepAlive param wiring on initial start. Session lifecycle management has more edge cases than you&rsquo;d expect &mdash; each one was a dropped message or a zombie process in production.</p>
+
+        <h3>Bridge Endpoint</h3>
+        <p>A new server-side <strong>bridge endpoint</strong> enables cross-service communication with multi-session support. This is the plumbing for connecting external systems to agent sessions &mdash; a single API surface that routes messages to the right session regardless of which bridge originated them. Full module spec written and validated.</p>
+
+        <h3>GitHub Workflow Automation</h3>
+        <p>Four features that tighten up how the team ships code:</p>
+        <ul>
+          <li><strong>Conventional commits enforced</strong> &mdash; all agents now follow the <code>type(scope): message</code> format. No more guessing what a commit does from a cryptic one-liner.</li>
+          <li><strong>Auto-labeled PRs</strong> &mdash; PRs get tagged by type (<code>feat</code>, <code>fix</code>, <code>docs</code>) and by which agent authored them. Filtering the PR list by agent or change type is now trivial.</li>
+          <li><strong><code>formatIssueBody()</code> helper</strong> &mdash; automatically detects whether an issue is a bug report or feature request from the title and applies the right template. 80 lines of logic, 182 lines of tests.</li>
+          <li><strong>Standardized PR body template</strong> &mdash; every PR now gets a consistent structure with summary, changes, and test plan sections.</li>
+          <li><strong>Human collaborator attribution</strong> &mdash; when a human initiates work that an agent executes, the human gets credited on PRs, issues, and commits.</li>
+        </ul>
+
+        <h3>Discord @Mention Reliability</h3>
+        <p>Discord mentions got a focused overhaul. The old behavior was fragile &mdash; mentions would sometimes hijack existing sessions or lose context. Now:</p>
+        <ul>
+          <li>Each @mention creates a <strong>new isolated session</strong> with a 5-minute TTL</li>
+          <li>Embed footers show <strong>&ldquo;mention &middot; 5m&rdquo;</strong> labels with dynamic countdown timestamps</li>
+          <li>Channel context is <strong>stripped from new mention sessions</strong> to prevent context bleed</li>
+          <li>Project name now appears in embed footers for multi-project setups</li>
+        </ul>
+
+        <h3>Fledge Plugins Go Native</h3>
+        <p>Fledge plugins are now <strong>integrated directly into agent operations</strong>. Agents can discover and invoke fledge plugins through MCP, treating them as first-class tools alongside built-in capabilities. The &ldquo;Fledge First&rdquo; rule was codified in CLAUDE.md &mdash; agents should always reach for fledge before falling back to raw commands.</p>
+        <p>51 plugins currently installed, spanning official tooling (metrics, coverage, gitleaks, standup) and community contributions (codegolf, maze, quiz). The plugin ecosystem is growing faster than the core CLI.</p>
+
+        <h3>Platform Plumbing</h3>
+        <ul>
+          <li><strong>Context reconstruction made cold-start-only</strong> &mdash; warm turns skip the expensive context rebuild, cutting response latency on keep-alive sessions.</li>
+          <li><strong>Prior-context verification rule</strong> &mdash; agents now check for existing work from past sessions before starting, preventing duplicate effort across conversations.</li>
+          <li><strong>Work task commit validation</strong> &mdash; detects all uncommitted changes and verifies commits exist before attempting PR fallback. No more phantom PRs.</li>
+          <li><strong>Block explorer type safety</strong> &mdash; removed <code>any</code> casts on indexer query builders.</li>
+          <li><strong>Security:</strong> Resolved GHSA-v2v4-37r5-5v8g (ip-address XSS vulnerability).</li>
+          <li><strong>Dependency bumps:</strong> Zod 4.4.3, Anthropic SDK 0.93.0.</li>
+        </ul>
+
+        <h3>By the Numbers</h3>
+        <table style="width:100%; border-collapse:collapse; margin:1em 0;">
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Commits (v0.65&rarr;v0.66)</td><td style="padding:8px 12px; font-weight:700;">42</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Features shipped</td><td style="padding:8px 12px; font-weight:700;">20</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Bugs fixed</td><td style="padding:8px 12px; font-weight:700;">27</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Fledge plugins</td><td style="padding:8px 12px; font-weight:700;">51</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">API routes</td><td style="padding:8px 12px; font-weight:700;">58</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 12px; color:var(--text-dim);">Total lines of code</td><td style="padding:8px 12px; font-weight:700;">562,530</td></tr>
+          <tr><td style="padding:8px 12px; color:var(--text-dim);">Current version</td><td style="padding:8px 12px; font-weight:700;">v0.66.0</td></tr>
+        </table>
+
+        <h3>What&rsquo;s Next</h3>
+        <p>Keep-alive was the prerequisite for <strong>long-running autonomous workflows</strong> &mdash; agents that work on multi-hour tasks without losing thread. The bridge endpoint opens the door to <strong>external integrations</strong> beyond Discord and Telegram. And the GitHub automation pipeline means the team can ship faster with less friction &mdash; conventional commits, auto-labels, and structured templates remove the cognitive overhead of consistency.</p>
+        <p>Next up: capacity-based context compaction improvements, unified embed builder across bridges, and continued process decomposition of the session manager.</p>
+        <p><em>corvid-agent v0.66.0 is available now. <a href="https://github.com/CorvidLabs/corvid-agent" target="_blank">GitHub</a> &mdash; <a href="https://corvidlabs.github.io/corvid-agent/" target="_blank">Docs</a></em></p>
+      </article>
+
       <!-- Post: v0.65 — On-Chain Attestations, Context Intelligence, and the Trust Layer -->
       <article class="post post--full" id="v065-trust-layer"
                data-tags="release,engineering,research" data-date="2026-05-02"
