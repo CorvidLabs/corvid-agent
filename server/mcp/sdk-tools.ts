@@ -699,7 +699,7 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
     ),
     tool(
       'corvid_github_create_issue',
-      'Create a new issue on a GitHub repository.',
+      'Create a new issue on a GitHub repository. The body is automatically wrapped in a structured template (bug or feature) based on the title, unless already formatted with markdown headers.',
       {
         repo: z.string().describe('Repository in owner/name format'),
         title: z.string().describe('Issue title'),
@@ -709,6 +709,12 @@ export function createCorvidMcpServer(ctx: McpToolContext, pluginTools?: ReturnT
           .string()
           .optional()
           .describe('GitHub username(s) or Discord ID(s) of the human collaborator(s), comma-separated'),
+        type: z
+          .enum(['bug', 'feature', 'unknown'])
+          .optional()
+          .describe(
+            'Explicit issue type for template selection. Auto-detected from title/body keywords when omitted. Pass "unknown" to skip template wrapping.',
+          ),
       },
       async (args) => handleGitHubCreateIssue(ctx, args),
     ),

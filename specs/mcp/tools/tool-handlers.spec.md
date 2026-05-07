@@ -134,7 +134,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 | `handleGitHubListPrs` | `(ctx, { repo, state? })` | `Promise<CallToolResult>` | List pull requests for a repo |
 | `handleGitHubCreatePr` | `(ctx, { repo, title, body, head, base? })` | `Promise<CallToolResult>` | Create a pull request |
 | `handleGitHubReviewPr` | `(ctx, { repo, pr_number, body, event? })` | `Promise<CallToolResult>` | Review a pull request |
-| `handleGitHubCreateIssue` | `(ctx, { repo, title, body? })` | `Promise<CallToolResult>` | Create a GitHub issue |
+| `handleGitHubCreateIssue` | `(ctx, { repo, title, body, labels?, requested_by?, type? })` | `Promise<CallToolResult>` | Create a GitHub issue; body is wrapped in a structured bug/feature template (auto-detected from title/body keywords) unless already formatted with markdown headers or `type="unknown"` |
 | `handleGitHubListIssues` | `(ctx, { repo, state?, labels? })` | `Promise<CallToolResult>` | List issues for a repo |
 | `handleGitHubRepoInfo` | `(ctx, { repo })` | `Promise<CallToolResult>` | Get repository metadata |
 | `handleGitHubGetPrDiff` | `(ctx, { repo, pr_number })` | `Promise<CallToolResult>` | Get the diff for a pull request |
@@ -182,6 +182,7 @@ Implements every `corvid_*` MCP tool handler. Each exported function takes an `M
 7. **Service availability checks**: Handlers check for optional services (e.g. `ctx.workTaskService`, `ctx.schedulerService`) before use and return error results if missing
 8. **Status emission**: Long-running handlers call `ctx.emitStatus?.()` to provide progress updates to the UI
 9. **Agent identity signature**: GitHub write operations (`handleGitHubCreatePr`, `handleGitHubCreateIssue`, `handleGitHubCommentOnPr`, `handleGitHubReviewPr`) append an agent identity footer to the body via `buildAgentSignature()`. If the agent cannot be resolved, no signature is appended (fail-open). PR and issue creation tools accept an optional `requested_by` parameter to attribute human collaborators — resolved via the contacts DB and displayed as `Requested by: @username` in the footer
+10. **Issue body template**: `handleGitHubCreateIssue` wraps plain-text bodies in a structured template via `formatIssueBody()` (from `github-issue-body.ts`). Bug issues get Description/Steps to Reproduce/Expected Behavior/Actual Behavior sections; feature requests get Description/Motivation/Proposed Solution sections. Bodies already containing markdown `##` headers are passed through unchanged (backward compatible). An explicit `type` parameter overrides auto-detection; `type="unknown"` skips wrapping entirely
 
 ## Behavioral Examples
 
@@ -289,3 +290,4 @@ Internal constants (not env-configurable):
 | 2026-05-01 | corvid-agent | Documented handleEscalateWorkTask export from work.ts (#2215) |
 | 2026-05-06 | corvid-agent | Added bridge tool handlers: handleBridgeListSessions, handleBridgeRequest (#2287) |
 | 2026-05-06 | corvid-agent | Added github-issue-body.ts: formatIssueBody/detectIssueType helpers (#2273) |
+| 2026-05-07 | corvid-agent | Wired formatIssueBody into handleGitHubCreateIssue; added type parameter to corvid_github_create_issue (#2273) |

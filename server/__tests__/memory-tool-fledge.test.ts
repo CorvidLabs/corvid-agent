@@ -35,7 +35,7 @@ function createMockContext(overrides?: Partial<McpToolContext>): McpToolContext 
   } as McpToolContext;
 }
 
-function createMockFledgeClient(overrides?: Partial<Record<string, Function>>): FledgeClient {
+function createMockFledgeClient(overrides?: Partial<Record<string, (...args: never[]) => unknown>>): FledgeClient {
   return {
     memory: mock(() => Promise.resolve({ ok: true, tier: 'ephemeral' })),
     ...overrides,
@@ -46,7 +46,7 @@ beforeEach(() => {
   db = new Database(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
-  db.query("INSERT INTO agents (id, name, model, system_prompt) VALUES (?, ?, ?, ?)").run(
+  db.query('INSERT INTO agents (id, name, model, system_prompt) VALUES (?, ?, ?, ?)').run(
     'agent-test',
     'TestAgent',
     'test',
@@ -103,9 +103,7 @@ describe('handleSaveMemory (fledge delegation)', () => {
 describe('handleRecallMemory (fledge delegation)', () => {
   test('uses fledge recall when available and result contains via fledge', async () => {
     const fledge = createMockFledgeClient({
-      memory: mock(() =>
-        Promise.resolve({ ok: true, value: 'recalled data', tier: 'mutable', txid: 'TX123' }),
-      ),
+      memory: mock(() => Promise.resolve({ ok: true, value: 'recalled data', tier: 'mutable', txid: 'TX123' })),
     });
     const ctx = createMockContext({ fledgeClient: fledge });
     const result = await handleRecallMemory(ctx, { key: 'my-key' });
@@ -131,9 +129,7 @@ describe('handlePromoteMemory (fledge delegation)', () => {
   test('uses fledge promote when available', async () => {
     saveMemory(db, { agentId: 'agent-test', key: 'promote-key', content: 'promote me' });
     const fledge = createMockFledgeClient({
-      memory: mock(() =>
-        Promise.resolve({ ok: true, assetId: 999, txid: 'TX-PROMOTE' }),
-      ),
+      memory: mock(() => Promise.resolve({ ok: true, assetId: 999, txid: 'TX-PROMOTE' })),
     });
     const ctx = createMockContext({ fledgeClient: fledge });
     const result = await handlePromoteMemory(ctx, { key: 'promote-key' });

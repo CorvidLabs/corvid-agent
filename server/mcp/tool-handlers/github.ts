@@ -10,6 +10,7 @@ import {
   isRepoAllowedForScheduler,
   SCHEDULER_ESCALATION_LABEL,
 } from '../scheduler-tool-gating';
+import { formatIssueBody, type IssueType } from './github-issue-body';
 import type { McpToolContext } from './types';
 import { errorResult, textResult } from './types';
 
@@ -315,7 +316,7 @@ export async function handleGitHubReviewPr(
 
 export async function handleGitHubCreateIssue(
   ctx: McpToolContext,
-  args: { repo: string; title: string; body: string; labels?: string[]; requested_by?: string },
+  args: { repo: string; title: string; body: string; labels?: string[]; requested_by?: string; type?: IssueType },
 ): Promise<CallToolResult> {
   try {
     assertRepoAllowed(args.repo);
@@ -330,7 +331,8 @@ export async function handleGitHubCreateIssue(
       }
     }
     const collaborators = resolveRequestedBy(ctx, args.requested_by);
-    const bodyWithSig = args.body + buildAgentSignature(ctx, collaborators);
+    const formattedBody = formatIssueBody(args.title, args.body, args.type ? { issueType: args.type } : undefined);
+    const bodyWithSig = formattedBody + buildAgentSignature(ctx, collaborators);
     const result = await github.createIssue(args.repo, args.title, bodyWithSig, effectiveLabels);
     if (!result.ok) return errorResult(result.error ?? 'Failed to create issue');
     return textResult(`Issue created: ${result.issueUrl ?? 'success'}`);
