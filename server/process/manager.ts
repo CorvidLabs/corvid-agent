@@ -561,6 +561,8 @@ export class ProcessManager {
       toolAllowList?: string[];
       mcpToolAllowList?: string[];
       skipSkillPrompt?: boolean;
+      /** Track bot-sent Discord message IDs so replies route back to this session. */
+      trackDiscordBotMessage?: (messageId: string, channelId: string) => void;
     },
   ): Promise<void> {
     const resolved = await resolveProjectDir(project);
