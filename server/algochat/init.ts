@@ -13,6 +13,7 @@ import type { AstParserService } from '../ast/service';
 import type { UsageMeter } from '../billing/meter';
 import { createUsdcRevenueService } from '../billing/usdc-revenue';
 import type { AlgoChatState } from '../bootstrap';
+import type { BridgeService } from '../bridge/service';
 import type { BrowserService } from '../browser/service';
 import type { MemorySyncService } from '../db/memory-sync';
 import { publishToTenant } from '../events/broadcasting';
@@ -74,6 +75,7 @@ export interface AlgoChatInitDeps {
   healthMonitorService: HealthMonitorService;
   mentionPollingService: MentionPollingService;
   flockDirectoryService: FlockDirectoryService;
+  bridgeService?: BridgeService;
   browserService?: BrowserService;
 }
 
@@ -100,6 +102,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     permissionBroker,
     shutdownCoordinator,
     flockDirectoryService,
+    bridgeService,
     browserService,
   } = deps;
 
@@ -210,6 +213,7 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
     permissionBroker,
     processManager,
     flockDirectoryService,
+    bridgeService,
     browserService,
   });
 

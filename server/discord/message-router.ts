@@ -589,17 +589,13 @@ async function handleMentionReply(
     await sendDiscordMessage(ctx.delivery, ctx.config.botToken, channelId, `⚠️ ${complexityWarning}`);
   }
 
-  // Build conversation context from channel history (aggregated across recent sessions)
-  const previousContext = buildChannelContext(ctx.db, channelId);
-
-  // Start the process with the text prompt (include attachment URLs so the agent
-  // sees image links even though startProcess only accepts strings).
+  // New mentions start with a clean slate — no channel context injection.
+  // Resumed mentions (reply-to-bot cold start) still get channel context at the resume path.
   const textWithUrls = appendAttachmentUrls(
     withAuthorContext(cleanText, authorId, authorUsername, channelId),
     attachments,
   );
-  const promptWithContext = previousContext ? `${previousContext}\n\n${textWithUrls}` : textWithUrls;
-  ctx.processManager.startProcess(session, promptWithContext, { skipSkillPrompt: true });
+  ctx.processManager.startProcess(session, textWithUrls, { skipSkillPrompt: true });
   ctx.processManager.setKeepAliveTtl(session.id, MENTION_KEEP_ALIVE_TTL_MS);
 
   // Record inbound Discord message as a short-term observation for context retention
@@ -610,6 +606,7 @@ async function handleMentionReply(
     content: `[discord] ${authorUsername} in #${channelId}: ${cleanText.slice(0, 500)}`,
     suggestedKey: `discord:${session.id}`,
     relevanceScore: 1.5,
+    channelId,
   });
 
   subscribeForAdaptiveInlineResponse(
@@ -715,7 +712,7 @@ async function handleMentionReplyResume(
         ? contextualContent
         : appendAttachmentUrls(withAuthorContext(cleanText, authorId, authorUsername, channelId), attachments);
     // Re-inject channel context on resume so the agent sees messages posted by other users
-    // since the last exchange — mirrors the new-session path at buildChannelContext call above.
+    // since the last exchange. New mentions intentionally skip this for a clean slate.
     const channelContext = buildChannelContext(ctx.db, channelId);
     const resumeTextWithContext = channelContext ? `${channelContext}\n\n${resumeText}` : resumeText;
     ctx.processManager.resumeProcess(session, resumeTextWithContext);

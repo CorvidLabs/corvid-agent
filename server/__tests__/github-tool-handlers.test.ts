@@ -52,6 +52,7 @@ const mockAddPrComment = mock(() => Promise.resolve({ ok: true, error: undefined
 const mockFollowUser = mock(() =>
   Promise.resolve({ ok: true, message: 'Followed testuser', error: undefined as string | undefined }),
 );
+const mockLabelPrIfAllowed = mock(() => Promise.resolve());
 
 mock.module('../github/operations', () => ({
   starRepo: mockStarRepo,
@@ -67,6 +68,7 @@ mock.module('../github/operations', () => ({
   addPrComment: mockAddPrComment,
   followUser: mockFollowUser,
   isGitHubConfigured: () => true,
+  labelPrIfAllowed: mockLabelPrIfAllowed,
 }));
 
 // Set env vars before importing handlers so scheduler-tool-gating reads the correct allowed orgs
@@ -145,6 +147,7 @@ beforeEach(() => {
     .mockResolvedValue({ ok: true, diff: 'diff --git a/file.ts b/file.ts\n+new line', error: undefined });
   mockAddPrComment.mockReset().mockResolvedValue({ ok: true, error: undefined });
   mockFollowUser.mockReset().mockResolvedValue({ ok: true, message: 'Followed testuser', error: undefined });
+  mockLabelPrIfAllowed.mockReset().mockResolvedValue(undefined);
 });
 
 // ── Star / Unstar ────────────────────────────────────────────────────────
@@ -349,6 +352,68 @@ describe('handleGitHubCreatePr', () => {
     });
     expect(result.isError).toBe(true);
     expect(getText(result)).toContain('Branch not found');
+  });
+
+  test('calls labelPrIfAllowed after successful PR creation', async () => {
+    mockCreatePr.mockResolvedValue({
+      ok: true,
+      prUrl: 'https://github.com/CorvidLabs/corvid-agent/pull/99',
+      error: undefined,
+    });
+    const ctx = makeCtx();
+    await handleGitHubCreatePr(ctx, {
+      repo: 'CorvidLabs/corvid-agent',
+      title: 'feat(github): auto-label PRs',
+      body: 'Description',
+      head: 'feat/labels',
+    });
+    expect(mockLabelPrIfAllowed).toHaveBeenCalledWith(
+      'CorvidLabs/corvid-agent',
+      'https://github.com/CorvidLabs/corvid-agent/pull/99',
+      'feat(github): auto-label PRs',
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  test('calls labelPrIfAllowed for non-CorvidLabs repos too (function handles org check)', async () => {
+    mockCreatePr.mockResolvedValue({
+      ok: true,
+      prUrl: 'https://github.com/other-org/some-repo/pull/5',
+      error: undefined,
+    });
+    const ctx = makeCtx();
+    await handleGitHubCreatePr(ctx, {
+      repo: 'other-org/some-repo',
+      title: 'feat: thing',
+      body: 'Body',
+      head: 'feat/thing',
+    });
+    expect(mockLabelPrIfAllowed).toHaveBeenCalledWith(
+      'other-org/some-repo',
+      'https://github.com/other-org/some-repo/pull/5',
+      'feat: thing',
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  test('label failure does not block PR creation success', async () => {
+    mockCreatePr.mockResolvedValue({
+      ok: true,
+      prUrl: 'https://github.com/CorvidLabs/corvid-agent/pull/99',
+      error: undefined,
+    });
+    mockLabelPrIfAllowed.mockRejectedValue(new Error('GitHub API error'));
+    const ctx = makeCtx();
+    const result = await handleGitHubCreatePr(ctx, {
+      repo: 'CorvidLabs/corvid-agent',
+      title: 'fix: something',
+      body: 'Body',
+      head: 'fix/something',
+    });
+    expect(result.isError).toBeUndefined();
+    expect(getText(result)).toContain('PR created');
   });
 });
 
