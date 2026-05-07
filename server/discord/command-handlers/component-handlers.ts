@@ -7,10 +7,10 @@
 
 import type { GuildMember, MessageComponentInteraction, RepliableInteraction } from 'discord.js';
 import type { SessionSource } from '../../../shared/types';
-import { listAgents } from '../../db/agents';
+import { getAgent, listAgents } from '../../db/agents';
 import { deleteThreadSession, saveThreadSession, updateThreadSessionActivity } from '../../db/discord-thread-sessions';
 import { listProjects } from '../../db/projects';
-import { createSession, getSession } from '../../db/sessions';
+import { createSession, getSession, updateSession } from '../../db/sessions';
 import { createLogger } from '../../lib/logger';
 import { resolveAndCreateWorktree } from '../../lib/worktree';
 import type { InteractionContext } from '../commands';
@@ -188,19 +188,22 @@ export async function handleComponentInteraction(
       const sourceSessionId = parts[1];
       const sourceSession = sourceSessionId ? getSession(ctx.db, sourceSessionId) : null;
 
-      // Resolve agent
-      const ctAgent = resolveDefaultAgent(ctx.db, ctx.config);
+      if (!sourceSession) {
+        await respondToInteraction(ri, 'Source session not found. Try using `/session` instead.');
+        return;
+      }
+
+      // Resolve agent and project from the source session (not defaults)
+      const ctAgent = sourceSession.agentId ? getAgent(ctx.db, sourceSession.agentId) : null;
       if (!ctAgent) {
-        await respondToInteraction(ri, 'No agents configured.');
+        await respondToInteraction(ri, 'Agent not found for this session.');
         return;
       }
 
       const ctProjects = listProjects(ctx.db);
-      const ctProject = ctAgent.defaultProjectId
-        ? (ctProjects.find((p) => p.id === ctAgent.defaultProjectId) ?? ctProjects[0])
-        : ctProjects[0];
+      const ctProject = ctProjects.find((p) => p.id === sourceSession.projectId);
       if (!ctProject) {
-        await respondToInteraction(ri, 'No projects configured.');
+        await respondToInteraction(ri, 'Project not found for this session.');
         return;
       }
 
@@ -213,25 +216,22 @@ export async function handleComponentInteraction(
         return;
       }
 
-      // Create worktree
-      let ctWorkDir: string | undefined;
-      if (ctProject.workingDir || ctProject.gitUrl) {
-        const result = await resolveAndCreateWorktree(ctProject, ctAgent.name, crypto.randomUUID());
-        if (result.success) ctWorkDir = result.workDir;
+      // Clean up mention session tracking (keyed by bot message ID — find by session ID)
+      for (const [botMsgId, info] of ctx.mentionSessions) {
+        if (info.sessionId === sourceSession.id) {
+          ctx.mentionSessions.delete(botMsgId);
+          break;
+        }
       }
 
-      const ctSession = createSession(ctx.db, {
-        projectId: ctProject.id,
-        agentId: ctAgent.id,
+      // Re-map the existing session to the thread (no new session or process needed)
+      const updatedSession = updateSession(ctx.db, sourceSession.id, {
         name: `Discord thread:${newThreadId}`,
-        initialPrompt: 'Continued from channel mention',
-        source: 'discord' as SessionSource,
-        workDir: ctWorkDir,
         keepAlive: true,
       });
 
       const ctThreadInfo: ThreadSessionInfo = {
-        sessionId: ctSession.id,
+        sessionId: sourceSession.id,
         agentName: ctAgent.name,
         agentModel: ctAgent.model || 'unknown',
         ownerUserId: userId,
@@ -245,8 +245,9 @@ export async function handleComponentInteraction(
       ctx.threadLastActivity.set(newThreadId, Date.now());
       saveThreadSession(ctx.db, newThreadId, ctThreadInfo);
 
+      // Subscribe for responses in the new thread (re-routes output from channel to thread)
       ctx.subscribeForResponseWithEmbed(
-        ctSession.id,
+        sourceSession.id,
         newThreadId,
         ctAgent.name,
         ctAgent.model || 'unknown',
@@ -256,11 +257,11 @@ export async function handleComponentInteraction(
         ctAgent.avatarUrl,
       );
 
-      // Carry context from the source session if available
-      const contextMsg = sourceSession
-        ? 'Continued from a channel conversation. The user clicked "Continue in Thread" to move this conversation here. Greet them and ask how you can help.'
-        : 'New thread session started from a channel conversation. Greet the user and ask how you can help.';
-      ctx.processManager.startProcess(ctSession, contextMsg);
+      // Continue the conversation — startProcess handles both alive (warm send) and
+      // dead (context reconstruction) processes, so full history is preserved either way
+      const contextMsg =
+        'Continued from a channel conversation. The user clicked "Continue in Thread" to move this conversation here. Greet them and ask how you can help.';
+      ctx.processManager.startProcess(updatedSession ?? sourceSession, contextMsg);
 
       await acknowledgeButton(ri, `Thread created! Continue the conversation in <#${newThreadId}>.`);
       break;
