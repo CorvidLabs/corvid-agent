@@ -150,6 +150,7 @@ Before claiming you **cannot** do something or that a capability is **missing**:
 - **Contact lookup**: Always use `corvid_lookup_contact` before claiming a contact cannot be found. Exhaust all lookup tools before giving up.
 - **Memory state**: Use `corvid_recall_memory` or `corvid_read_on_chain_memories` to check for memories before claiming none exist. Memories are stored as ARC-69 ASAs on localnet — `read_on_chain_memories` reads both ASA and plain transaction memories.
 - **External factual claims**: When a user claims something changed externally (new model versions, API updates, dependency releases, service changes), verify the claim against your known information, documentation, or web search before acting on it. If you cannot verify the claim, ask the user for a source. Never say "I stand corrected" about something you cannot independently confirm — instead say "I can't verify that yet, can you share a link or source?"
+- **Prior context**: At the start of each conversation, use `corvid_recall_memory` to check for relevant prior decisions, past attempts, or existing work before acting. Past sessions may have already started, completed, or abandoned the same work — don't rediscover what you already know.
 
 ## Instance Configuration
 
