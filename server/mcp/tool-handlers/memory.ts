@@ -427,9 +427,7 @@ export async function handleReadOnChainMemories(
         if (args.search) {
           const s = args.search.toLowerCase();
           filtered = memories.filter(
-            (m) =>
-              m.key.toLowerCase().includes(s) ||
-              (m.value ?? m.content ?? '').toLowerCase().includes(s),
+            (m) => m.key.toLowerCase().includes(s) || (m.value ?? m.content ?? '').toLowerCase().includes(s),
           );
         }
 

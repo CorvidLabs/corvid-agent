@@ -9,7 +9,7 @@
  * Usage: bun run scripts/fledge-identity-bridge.ts [--agent-id corvid-agent]
  */
 import { Database } from 'bun:sqlite';
-import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import algosdk from 'algosdk';
 
