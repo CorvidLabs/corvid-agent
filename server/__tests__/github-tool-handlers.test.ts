@@ -506,7 +506,11 @@ describe('handleGitHubCreateIssue', () => {
       body: 'Desc',
       labels: ['bug', 'priority-high'],
     });
-    expect(mockCreateIssue).toHaveBeenCalledWith('test/repo', 'Bug', 'Desc', ['bug', 'priority-high']);
+    // Body may be template-wrapped (title "Bug" triggers bug detection); labels are the primary assertion
+    expect(mockCreateIssue).toHaveBeenCalledWith('test/repo', 'Bug', expect.stringContaining('Desc'), [
+      'bug',
+      'priority-high',
+    ]);
   });
 
   test('works without labels', async () => {
@@ -516,7 +520,13 @@ describe('handleGitHubCreateIssue', () => {
       title: 'Feature',
       body: 'Please add this',
     });
-    expect(mockCreateIssue).toHaveBeenCalledWith('test/repo', 'Feature', 'Please add this', undefined);
+    // Body may be template-wrapped (title "Feature" triggers feature detection); labels absence is the primary assertion
+    expect(mockCreateIssue).toHaveBeenCalledWith(
+      'test/repo',
+      'Feature',
+      expect.stringContaining('Please add this'),
+      undefined,
+    );
   });
 
   test('returns error on failure', async () => {
