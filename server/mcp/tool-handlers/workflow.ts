@@ -94,7 +94,7 @@ export async function handleManageWorkflow(
       case 'get': {
         if (!args.workflow_id) return errorResult('workflow_id is required');
         const workflow = getWorkflow(ctx.db, args.workflow_id);
-        if (!workflow) return errorResult('Workflow not found');
+        if (!workflow || workflow.agentId !== ctx.agentId) return errorResult('Workflow not found');
 
         const nodeList = workflow.nodes.map((n) => `  - ${n.id}: ${n.type} "${n.label}"`).join('\n');
         const edgeList = workflow.edges
@@ -112,6 +112,8 @@ export async function handleManageWorkflow(
 
       case 'activate': {
         if (!args.workflow_id) return errorResult('workflow_id is required');
+        const existing = getWorkflow(ctx.db, args.workflow_id);
+        if (!existing || existing.agentId !== ctx.agentId) return errorResult('Workflow not found');
         const updated = updateWorkflow(ctx.db, args.workflow_id, { status: 'active' });
         if (!updated) return errorResult('Workflow not found');
         return textResult(`Workflow "${updated.name}" activated. It can now be triggered.`);
@@ -119,6 +121,8 @@ export async function handleManageWorkflow(
 
       case 'pause': {
         if (!args.workflow_id) return errorResult('workflow_id is required');
+        const existing = getWorkflow(ctx.db, args.workflow_id);
+        if (!existing || existing.agentId !== ctx.agentId) return errorResult('Workflow not found');
         const updated = updateWorkflow(ctx.db, args.workflow_id, { status: 'paused' });
         if (!updated) return errorResult('Workflow not found');
         return textResult(`Workflow "${updated.name}" paused.`);
@@ -127,6 +131,8 @@ export async function handleManageWorkflow(
       case 'trigger': {
         if (!args.workflow_id) return errorResult('workflow_id is required');
         if (!ctx.workflowService) return errorResult('Workflow service not available');
+        const existing = getWorkflow(ctx.db, args.workflow_id);
+        if (!existing || existing.agentId !== ctx.agentId) return errorResult('Workflow not found');
 
         const run = await ctx.workflowService.triggerWorkflow(args.workflow_id, args.input ?? {});
         return textResult(
@@ -138,7 +144,17 @@ export async function handleManageWorkflow(
       }
 
       case 'runs': {
-        const runs = listWorkflowRuns(ctx.db, args.workflow_id, 20);
+        if (args.workflow_id) {
+          const workflow = getWorkflow(ctx.db, args.workflow_id);
+          if (!workflow || workflow.agentId !== ctx.agentId) return errorResult('Workflow not found');
+        }
+        const runs = listWorkflowRuns(
+          ctx.db,
+          args.workflow_id,
+          20,
+          undefined,
+          args.workflow_id ? undefined : ctx.agentId,
+        );
         if (runs.length === 0) return textResult('No workflow runs found.');
         const lines = runs.map(
           (r) =>
@@ -150,7 +166,7 @@ export async function handleManageWorkflow(
       case 'run_status': {
         if (!args.run_id) return errorResult('run_id is required');
         const run = getWorkflowRun(ctx.db, args.run_id);
-        if (!run) return errorResult('Run not found');
+        if (!run || run.agentId !== ctx.agentId) return errorResult('Run not found');
 
         const nodeLines = run.nodeRuns.map(
           (nr) =>
