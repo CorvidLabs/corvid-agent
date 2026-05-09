@@ -19,7 +19,7 @@ spec: bridge.spec.md
 
 ## Acceptance Criteria
 
-- A client that connects to `/api/bridge/ws` and sends a valid `auth` message receives `{ type: "auth_ok", sessionId: "..." }` and appears in `GET /api/bridge/sessions`
+- A client that connects to `/api/bridge` (or `/api/bridge/ws`) and sends a valid `auth` message receives `{ type: "auth-ok", sessionId: "..." }` and appears in `GET /api/bridge/sessions`
 - A client with the wrong token receives `{ error: "Invalid token" }` and is disconnected with close code 4001
 - A client that does not send an auth message within the auth timeout window is disconnected with close code 4001
 - `BridgeService.sendRequest()` resolves with the `BridgeResponse` when the client replies within the timeout
@@ -37,7 +37,7 @@ spec: bridge.spec.md
 
 ## Constraints
 
-- The bridge WebSocket endpoint (`/api/bridge/ws`) requires the same API key used for all other corvid-agent auth
+- The bridge WebSocket endpoint (`/api/bridge`) uses its own first-message auth handshake (same API key, sent as `token` in the auth message)
 - Bridge session IDs are server-generated UUIDs — the client cannot choose its own session ID
 - Content payloads for file writes are capped at 10 MB; paths at 4096 characters; commands at 8192 characters
 - The bridge has no persistent storage — sessions are in-memory only and lost on server restart

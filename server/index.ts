@@ -321,15 +321,10 @@ const server = Bun.serve<WsData>({
     }
 
     // Bridge WebSocket upgrade (developer environment bridge)
-    if (url.pathname === '/api/bridge/ws') {
-      const bridgePreAuth = checkWsAuth(req, url, authConfig);
-      if (authConfig.apiKey && !bridgePreAuth) {
-        return new Response(JSON.stringify({ error: 'Authentication required' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' },
-        });
-      }
-
+    // Bridge auth is handled via the first WebSocket message (BridgeAuthMessage),
+    // not the HTTP upgrade — skip HTTP-level auth to allow clients that only
+    // implement the WebSocket-level handshake (e.g. fledge-plugin-bridge).
+    if (url.pathname === '/api/bridge/ws' || url.pathname === '/api/bridge') {
       const sessionId = crypto.randomUUID();
       const upgraded = server.upgrade(rawReq, {
         data: {

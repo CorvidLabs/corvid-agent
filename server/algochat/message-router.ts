@@ -407,6 +407,7 @@ export class MessageRouter {
       initialPrompt: content,
       source: 'web',
       workDir,
+      keepAlive: true,
     });
 
     log.debug(`Session created: ${session.id}, starting process`);
@@ -654,6 +655,7 @@ export class MessageRouter {
           initialPrompt: agentContent,
           source: 'algochat',
           workDir: worktreeResult2?.workDir,
+          keepAlive: true,
         });
 
         conversation = createConversation(this.db, participant, agentId, session.id);
@@ -714,6 +716,7 @@ export class MessageRouter {
                 initialPrompt: agentContent,
                 source: 'algochat',
                 workDir: worktreeResult3?.workDir,
+                keepAlive: true,
               });
               updateConversationSession(this.db, conversation.id, session.id);
               conversation.sessionId = session.id;

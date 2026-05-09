@@ -162,7 +162,7 @@ export function createWebSocketHandler(
 
       data.authenticated = true;
       service.registerSession(data.sessionId, label, projectId, effectiveCaps, ws);
-      ws.send(JSON.stringify({ type: 'auth_ok', sessionId: data.sessionId }));
+      ws.send(JSON.stringify({ type: 'auth-ok', sessionId: data.sessionId }));
       return;
     }
 
