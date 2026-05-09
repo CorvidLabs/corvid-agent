@@ -208,7 +208,6 @@ export function listWorkflowRuns(
   workflowId?: string,
   limit = 50,
   tenantId: string = DEFAULT_TENANT_ID,
-  agentId?: string,
 ): WorkflowRun[] {
   if (workflowId) {
     const { query, bindings } = withTenantFilter(
@@ -216,13 +215,6 @@ export function listWorkflowRuns(
       tenantId,
     );
     return (db.query(query).all(workflowId, ...bindings, limit) as Record<string, unknown>[]).map(rowToRun);
-  }
-  if (agentId) {
-    const { query, bindings } = withTenantFilter(
-      'SELECT * FROM workflow_runs WHERE agent_id = ? ORDER BY started_at DESC LIMIT ?',
-      tenantId,
-    );
-    return (db.query(query).all(agentId, ...bindings, limit) as Record<string, unknown>[]).map(rowToRun);
   }
   const { query, bindings } = withTenantFilter(
     'SELECT * FROM workflow_runs ORDER BY started_at DESC LIMIT ?',
