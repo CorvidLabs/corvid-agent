@@ -72,6 +72,10 @@ export class AlgoChatBridge implements ChannelAdapter {
   private discoveryPoller: PSKDiscoveryPoller;
   private messageRouter: MessageRouter;
 
+  // Localnet PSK bridge (for dual-network operation)
+  private localnetContactManager: PSKContactManager | null = null;
+  private localnetDiscoveryPoller: PSKDiscoveryPoller | null = null;
+
   // Optional dependencies (for getter access)
   private agentWalletService: AgentWalletService | null = null;
 
@@ -178,6 +182,49 @@ export class AlgoChatBridge implements ChannelAdapter {
     this.commandHandler.setAgentMessenger(messenger);
   }
 
+  // ── Localnet PSK bridge (dual-network support) ────────────────────
+
+  /**
+   * Add a secondary PSK bridge on localnet so that agents communicating
+   * on localnet (e.g. Merlin, Starling) can reach us even when the
+   * primary messaging network is testnet/mainnet.
+   */
+  addLocalnetPSKBridge(localnetService: AlgoChatService, localnetConfig: AlgoChatConfig): void {
+    this.localnetContactManager = new PSKContactManager(this.db, localnetConfig, localnetService);
+    this.localnetDiscoveryPoller = new PSKDiscoveryPoller(
+      this.db,
+      localnetConfig,
+      localnetService,
+      this.localnetContactManager,
+    );
+
+    // Wire PSK message callback to the same message router
+    this.localnetContactManager.setOnPskMessage((msg) => {
+      this.messageRouter.handleIncomingMessage(msg.sender, msg.content, msg.confirmedRound, msg.amount).catch((err) => {
+        log.error('Error handling localnet PSK message', { error: err instanceof Error ? err.message : String(err) });
+      });
+    });
+
+    // Wire discovery poller first-message callback
+    this.localnetDiscoveryPoller.setOnFirstMessage((sender, text, round, amount) => {
+      this.messageRouter.handleIncomingMessage(sender, text, round, amount).catch((err) => {
+        log.error('Error handling discovered localnet PSK message', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    });
+
+    // Load existing localnet PSK contacts from DB
+    this.localnetContactManager.setupPSKManagers();
+
+    // Update the PSK manager lookup to check both networks
+    this.responseFormatter.setPskManagerLookup((address) => {
+      return this.contactManager.lookupPskManager(address) ?? this.localnetContactManager?.lookupPskManager(address) ?? null;
+    });
+
+    log.info('Localnet PSK bridge added for dual-network operation');
+  }
+
   // ── Public API ───────────────────────────────────────────────────────
 
   async sendApprovalRequest(participant: string, request: ApprovalRequestWire): Promise<void> {
@@ -190,6 +237,13 @@ export class AlgoChatBridge implements ChannelAdapter {
     this.contactManager.startMatched(this.config.syncInterval);
     this.discoveryPoller.start();
     this.discoveryService.startDiscoveryPolling();
+
+    // Start localnet PSK bridge if configured
+    if (this.localnetContactManager && this.localnetDiscoveryPoller) {
+      this.localnetContactManager.startMatched(this.config.syncInterval);
+      this.localnetDiscoveryPoller.start();
+    }
+
     log.info('Started listening for messages');
   }
 
@@ -200,6 +254,11 @@ export class AlgoChatBridge implements ChannelAdapter {
     this.discoveryService.cleanup();
     this.messageRouter.cleanupSessionNotifications();
     this.subscriptionManager.cleanup();
+
+    // Stop localnet PSK bridge
+    if (this.localnetContactManager) this.localnetContactManager.stopAll();
+    if (this.localnetDiscoveryPoller) this.localnetDiscoveryPoller.stop();
+
     log.info('Stopped');
   }
 

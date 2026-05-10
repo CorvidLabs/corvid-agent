@@ -74,6 +74,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 | `setOwnerQuestionManager` | `(manager: OwnerQuestionManager)` | `void` | Late-inject owner question manager |
 | `setWorkTaskService` | `(service: WorkTaskService)` | `void` | Late-inject work task service (wraps in a `WorkCommandRouter` for the command handler) |
 | `setAgentMessenger` | `(messenger: AgentMessenger)` | `void` | Late-inject agent messenger |
+| `addLocalnetPSKBridge` | `(service: AlgoChatService, config: AlgoChatConfig)` | `void` | Add secondary PSK bridge on localnet for dual-network PSK contact discovery and messaging |
 | `sendApprovalRequest` | `(participant: string, request: ApprovalRequestWire)` | `Promise<void>` | Send a tool approval request to a participant via on-chain message |
 | `start` | `()` | `void` | Start all PSK managers, sync polling, and discovery polling |
 | `stop` | `()` | `void` | Stop all PSK managers, polling timers, and session subscriptions |
@@ -112,6 +113,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 13. **Per-agent conversation access control**: Conversations can be routed to private agents. Non-owner access is checked against the per-agent conversation mode; denied requests fail silently without response
 14. **Session isolation**: AlgoChat-sourced sessions create isolated git worktrees for safe code execution
 15. **Session notification forwarding**: Approval requests, session errors, and session exits from AlgoChat-sourced sessions are forwarded as on-chain messages to the participant
+16. **Dual-network PSK bridge**: When `agentNetwork !== network`, a secondary PSKContactManager and PSKDiscoveryPoller are created on the localnet service. This allows agents communicating on localnet to reach us via PSK even when the primary messaging network is testnet/mainnet. Both managers share the same MessageRouter and ResponseFormatter lookup
 
 ## Behavioral Examples
 
@@ -190,3 +192,4 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 |------|--------|--------|
 | 2026-02-19 | corvid-agent | Initial spec |
 | 2026-04-14 | corvid-agent | Update service count (4→7), fix method signatures, update dedup invariant, add invariants 11-15, add missing methods, add worktree error case (#2018) |
+| 2026-05-09 | corvid-agent | Add dual-network PSK bridge: `addLocalnetPSKBridge` method, invariant 16 (merlin#48) |
