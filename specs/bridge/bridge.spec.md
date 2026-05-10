@@ -55,7 +55,7 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 
 | Function | Module | Parameters | Returns | Description |
 |----------|--------|-----------|---------|-------------|
-| `handleDevBridgeRoutes` | `server/routes/bridge.ts` | `(req, url, db, ctx, bridgeService)` | `Response \| null` | HTTP route handler for `/api/bridge/sessions` endpoints |
+| `handleDevBridgeRoutes` | `server/routes/bridge.ts` | `(req, url, db, ctx, bridgeService)` | `Promise<Response \| null>` | HTTP route handler for `/api/bridge/sessions` endpoints |
 | `handleBridgeListSessions` | `server/mcp/tool-handlers/bridge.ts` | `(ctx, args)` | `Promise<ToolResult>` | MCP handler for `corvid_bridge_sessions` |
 | `handleBridgeRequest` | `server/mcp/tool-handlers/bridge.ts` | `(ctx, args)` | `Promise<ToolResult>` | MCP handler for `corvid_bridge_request` |
 

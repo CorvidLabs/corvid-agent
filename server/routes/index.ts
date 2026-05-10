@@ -428,7 +428,7 @@ async function handleRoutes(
   const bridgeDeliveryResponse = handleBridgeDeliveryRoutes(req, url);
   if (bridgeDeliveryResponse) return bridgeDeliveryResponse;
 
-  const devBridgeResponse = handleDevBridgeRoutes(req, url, db, context, bridgeService ?? null);
+  const devBridgeResponse = await handleDevBridgeRoutes(req, url, db, context, bridgeService ?? null);
   if (devBridgeResponse) return devBridgeResponse;
 
   const discordImageResponse = handleDiscordImageRoutes(req, url, context);
