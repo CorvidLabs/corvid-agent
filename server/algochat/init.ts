@@ -138,6 +138,12 @@ export async function initAlgoChat(deps: AlgoChatInitDeps): Promise<void> {
 
   algochatState.bridge = new AlgoChatBridge(db, processManager, algochatConfig, service);
 
+  // Add localnet PSK bridge when agent network differs from messaging network
+  // so that agents communicating on localnet can reach us via PSK
+  if (algochatConfig.agentNetwork !== algochatConfig.network && agentService !== service) {
+    algochatState.bridge.addLocalnetPSKBridge(agentService, agentNetworkConfig);
+  }
+
   // Scan for plaintext key configuration issues (#924)
   const plaintextWarnings = detectPlaintextKeyConfig(agentNetworkConfig.network);
   if (plaintextWarnings.length > 0 && agentNetworkConfig.network === 'mainnet') {
