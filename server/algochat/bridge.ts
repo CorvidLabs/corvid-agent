@@ -219,7 +219,9 @@ export class AlgoChatBridge implements ChannelAdapter {
 
     // Update the PSK manager lookup to check both networks
     this.responseFormatter.setPskManagerLookup((address) => {
-      return this.contactManager.lookupPskManager(address) ?? this.localnetContactManager?.lookupPskManager(address) ?? null;
+      return (
+        this.contactManager.lookupPskManager(address) ?? this.localnetContactManager?.lookupPskManager(address) ?? null
+      );
     });
 
     log.info('Localnet PSK bridge added for dual-network operation');

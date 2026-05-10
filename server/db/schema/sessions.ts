@@ -53,6 +53,7 @@ export const tables: string[] = [
         server_restart_initiated_at  TEXT DEFAULT NULL,
         conversation_summary         TEXT DEFAULT NULL,
         keep_alive                   INTEGER NOT NULL DEFAULT 0,
+        warm_turn_count              INTEGER NOT NULL DEFAULT 0,
         active_duration_ms           INTEGER NOT NULL DEFAULT 0,
         duration_checkpoint          INTEGER DEFAULT NULL,
         tenant_id                    TEXT NOT NULL DEFAULT 'default',
