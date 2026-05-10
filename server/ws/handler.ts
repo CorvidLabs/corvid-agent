@@ -5,7 +5,7 @@ import { isClientMessage } from '../../shared/ws-protocol';
 import type { AgentMessenger } from '../algochat/agent-messenger';
 import type { AlgoChatBridge } from '../algochat/bridge';
 import type { BridgeService } from '../bridge/service';
-import type { BridgeWsData } from '../bridge/types';
+import type { BridgeCapabilities, BridgeResponse, BridgeWsData } from '../bridge/types';
 import { getSession } from '../db/sessions';
 import { createLogger } from '../lib/logger';
 import type { AuthConfig } from '../middleware/auth';
@@ -17,6 +17,12 @@ import type { SchedulerService } from '../scheduler/service';
 import type { WorkTaskService } from '../work/service';
 
 const log = createLogger('WebSocket');
+
+function isBridgeResponse(value: unknown): value is BridgeResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.id === 'string' && typeof v.type === 'string' && typeof v.success === 'boolean';
+}
 
 /** Convert a ClaudeStreamEvent to the WebSocket StreamEvent wire format. */
 function toStreamEvent(event: ClaudeStreamEvent): StreamEvent {
@@ -119,7 +125,7 @@ export function createWebSocketHandler(
     service: BridgeService,
   ): void {
     const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
@@ -130,13 +136,14 @@ export function createWebSocketHandler(
     const data = ws.data;
 
     if (!data.authenticated) {
-      if (parsed.type !== 'auth' || !parsed.token) {
+      const msg = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+      if (msg.type !== 'auth' || !msg.token) {
         ws.send(JSON.stringify({ error: 'First message must be auth' }));
         ws.close(1008, 'Auth required');
         return;
       }
 
-      if (authConfig.apiKey && !timingSafeEqual(parsed.token, authConfig.apiKey)) {
+      if (authConfig.apiKey && !timingSafeEqual(String(msg.token), authConfig.apiKey)) {
         ws.send(JSON.stringify({ error: 'Invalid token' }));
         ws.close(4001, 'Invalid token');
         return;
@@ -147,10 +154,10 @@ export function createWebSocketHandler(
         data.authTimeoutTimer = null;
       }
 
-      const label = typeof parsed.label === 'string' ? parsed.label.slice(0, MAX_LABEL_LENGTH) : 'unnamed';
-      const projectId = typeof parsed.projectId === 'string' ? parsed.projectId.slice(0, MAX_LABEL_LENGTH) : '';
+      const label = typeof msg.label === 'string' ? msg.label.slice(0, MAX_LABEL_LENGTH) : 'unnamed';
+      const projectId = typeof msg.projectId === 'string' ? msg.projectId.slice(0, MAX_LABEL_LENGTH) : '';
 
-      const clientCaps = parsed.capabilities ?? { read: true, write: false, exec: false };
+      const clientCaps = (msg.capabilities as BridgeCapabilities | undefined) ?? { read: true, write: false, exec: false };
       const effectiveCaps = service.intersectCapabilities(clientCaps);
 
       data.authenticated = true;
@@ -159,14 +166,14 @@ export function createWebSocketHandler(
       return;
     }
 
-    if (parsed.id && parsed.type && typeof parsed.success === 'boolean') {
+    if (isBridgeResponse(parsed)) {
       service.handleResponse(data.sessionId, parsed);
     }
   }
 
   return {
     open(ws: ServerWebSocket<WsData>) {
-      if ((ws.data as any).type === 'bridge') {
+      if (ws.data.type === 'bridge') {
         const bridgeData = ws.data as unknown as BridgeWsData;
         bridgeData.authTimeoutTimer = setTimeout(() => {
           log.warn(`Bridge auth timeout — closing unauthenticated connection: ${bridgeData.sessionId}`);
@@ -209,12 +216,12 @@ export function createWebSocketHandler(
     },
 
     message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
-      if ((ws.data as any).type === 'bridge') {
+      if (ws.data.type === 'bridge') {
         if (!bridgeService) {
           ws.close(1011, 'Bridge service unavailable');
           return;
         }
-        handleBridgeMessage(ws as any, message, bridgeService);
+        handleBridgeMessage(ws as unknown as ServerWebSocket<BridgeWsData>, message, bridgeService);
         return;
       }
       const raw = typeof message === 'string' ? message : message.toString();
@@ -292,7 +299,7 @@ export function createWebSocketHandler(
     },
 
     close(ws: ServerWebSocket<WsData>) {
-      if ((ws.data as any)?.type === 'bridge') {
+      if (ws.data?.type === 'bridge') {
         const bridgeData = ws.data as unknown as BridgeWsData;
         if (bridgeData.authTimeoutTimer) {
           clearTimeout(bridgeData.authTimeoutTimer);
