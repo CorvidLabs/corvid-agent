@@ -3,13 +3,13 @@ import type { BridgeService } from '../bridge/service';
 import { json } from '../lib/response';
 import type { RequestContext } from '../middleware/guards';
 
-export function handleDevBridgeRoutes(
+export async function handleDevBridgeRoutes(
   req: Request,
   url: URL,
   _db: Database,
   _context: RequestContext,
   bridgeService: BridgeService | null,
-): Response | null {
+): Promise<Response | null> {
   if (!url.pathname.startsWith('/api/bridge')) return null;
   if (!bridgeService) return json({ error: 'Bridge service not available' }, 503);
 

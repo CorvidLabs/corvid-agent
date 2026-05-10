@@ -9,7 +9,7 @@ describe('bridge routes', () => {
   test('GET /api/bridge/sessions returns empty list', async () => {
     const req = new Request('http://localhost/api/bridge/sessions');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, service);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, service);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(200);
     const body = await res!.json();
@@ -20,24 +20,24 @@ describe('bridge routes', () => {
   test('GET /api/bridge/sessions/:id returns 404 for unknown', async () => {
     const req = new Request('http://localhost/api/bridge/sessions/nonexistent');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, service);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, service);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(404);
     const body = await res!.json();
     expect(body.error).toBe('Session not found');
   });
 
-  test('non-bridge path returns null', () => {
+  test('non-bridge path returns null', async () => {
     const req = new Request('http://localhost/api/other');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, service);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, service);
     expect(res).toBeNull();
   });
 
-  test('returns 503 when bridge service is null', () => {
+  test('returns 503 when bridge service is null', async () => {
     const req = new Request('http://localhost/api/bridge/sessions');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, null);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, null);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(503);
   });
@@ -49,7 +49,7 @@ describe('bridge routes', () => {
 
     const req = new Request('http://localhost/api/bridge/sessions');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, svc);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, svc);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(200);
     const body = await res!.json();
@@ -65,7 +65,7 @@ describe('bridge routes', () => {
 
     const req = new Request('http://localhost/api/bridge/sessions/s2');
     const url = new URL(req.url);
-    const res = handleDevBridgeRoutes(req, url, null as any, context, svc);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, svc);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(200);
     const body = await res!.json();
