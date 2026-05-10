@@ -96,16 +96,25 @@
         <pre class="terminal__body"><code><span class="t-prompt">$</span> bun test server/security/
 
 <span class="accent-cyan">security-audit.test.ts</span>
-  <span class="accent-green">&#x2713;</span> 104 tests passed  <span class="t-comment"># Auth, CORS, CSP, content guards</span>
+  <span class="accent-green">&#x2713;</span> 105 tests passed  <span class="t-comment"># Auth, CORS, CSP, content guards</span>
 
 <span class="accent-magenta">jailbreak-prevention.test.ts</span>
   <span class="accent-green">&#x2713;</span>  81 tests passed  <span class="t-comment"># Prompt injection, role override, encoding evasion</span>
 
+<span class="accent-cyan">bash-security.test.ts</span>
+  <span class="accent-green">&#x2713;</span>  82 tests passed  <span class="t-comment"># Command injection, path traversal, shell escaping</span>
+
 <span class="accent-green">rate-limit-bypass.test.ts</span>
   <span class="accent-green">&#x2713;</span>  47 tests passed  <span class="t-comment"># Sliding window, IP spoofing, endpoint limits</span>
 
+<span class="accent-magenta">endpoint-rate-limit.test.ts</span>
+  <span class="accent-green">&#x2713;</span>  42 tests passed  <span class="t-comment"># Per-endpoint rate limits, config parsing</span>
+
+<span class="accent-green">rate-limit.test.ts + security-headers.test.ts + overview</span>
+  <span class="accent-green">&#x2713;</span>  29 tests passed  <span class="t-comment"># Core rate limiter, CSP/HSTS headers, route coverage</span>
+
 <span class="t-comment">───────────────────────────────────────</span>
-<span class="accent-cyan">Total:</span> <span class="accent-green">232 security tests</span> &mdash; all passing</code></pre>
+<span class="accent-cyan">Total:</span> <span class="accent-green">386 security tests</span> &mdash; all passing</code></pre>
       </div>
     </div>
   </section>
