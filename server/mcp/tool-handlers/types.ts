@@ -91,6 +91,8 @@ export interface McpToolContext {
   messageRateLimiter?: SessionMessageRateLimiter;
   /** Fledge CLI client for delegating to fledge plugins (memory, sql, localnet, algochat). */
   fledgeClient?: FledgeClient;
+  /** Track a bot-sent Discord message ID so replies route back to this session. */
+  trackDiscordBotMessage?: (messageId: string, channelId: string) => void;
 }
 
 export function textResult(text: string): CallToolResult {

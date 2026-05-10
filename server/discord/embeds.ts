@@ -510,19 +510,23 @@ export async function sendDiscordMessage(
   _botToken: string,
   channelId: string,
   content: string,
-): Promise<void> {
+): Promise<string[]> {
   const chunks = splitMessage(content, MAX_MESSAGE_LENGTH);
+  const messageIds: string[] = [];
 
   for (const chunk of chunks) {
     try {
-      await delivery.sendWithReceipt('discord', async () => {
+      const { result } = await delivery.sendWithReceipt('discord', async () => {
         const restClient = getRestClient();
-        await restClient.sendMessage(channelId, { content: chunk });
+        return restClient.sendMessage(channelId, { content: chunk });
       });
+      if (result?.id) messageIds.push(result.id);
     } catch {
       // Error already logged by DeliveryTracker
     }
   }
+
+  return messageIds;
 }
 
 export async function sendTypingIndicator(_botToken: string, channelId: string): Promise<void> {

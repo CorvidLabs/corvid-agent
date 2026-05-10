@@ -8,7 +8,7 @@ import { errorResult, textResult } from './types';
 const log = createLogger('McpToolHandlers');
 
 export async function handleDiscordSendMessage(
-  _ctx: McpToolContext,
+  ctx: McpToolContext,
   args: { channel_id: string; message: string; reply_to?: string },
 ): Promise<CallToolResult> {
   if (!args.channel_id?.trim()) {
@@ -25,7 +25,11 @@ export async function handleDiscordSendMessage(
 
   try {
     const delivery = getDeliveryTracker();
-    await sendDiscordMessage(delivery, botToken, args.channel_id, args.message);
+    const messageIds = await sendDiscordMessage(delivery, botToken, args.channel_id, args.message);
+
+    for (const id of messageIds) {
+      ctx.trackDiscordBotMessage?.(id, args.channel_id);
+    }
 
     log.info('Sent Discord message via MCP tool', {
       channelId: args.channel_id,
