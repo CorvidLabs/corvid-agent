@@ -32,5 +32,39 @@ export async function handleDevBridgeRoutes(
     });
   }
 
+  const requestMatch = url.pathname.match(/^\/api\/bridge\/sessions\/([^/]+)\/request$/);
+  if (requestMatch && req.method === 'POST') {
+    const sessionId = requestMatch[1];
+    const session = bridgeService.getSession(sessionId);
+    if (!session) return json({ error: 'Session not found' }, 404);
+
+    let body: { request_type: string; path?: string; content?: string; command?: string; cwd?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!body.request_type) return json({ error: 'request_type is required' }, 400);
+
+    const requestId = crypto.randomUUID();
+    const request = {
+      id: requestId,
+      type: body.request_type as 'file.read' | 'file.write' | 'file.list' | 'exec' | 'ping',
+      path: body.path,
+      content: body.content,
+      command: body.command,
+      cwd: body.cwd,
+    };
+
+    try {
+      const response = await bridgeService.sendRequest(sessionId, request);
+      return json(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return json({ error: message }, 500);
+    }
+  }
+
   return null;
 }

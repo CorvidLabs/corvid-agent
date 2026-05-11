@@ -628,6 +628,17 @@ describe('handleIncomingMessage', () => {
       expect((sm.subscribeForResponse as ReturnType<typeof mock>).mock.calls.length).toBe(1);
     });
 
+    test('creates session with keepAlive: true', async () => {
+      (ch.isOwner as ReturnType<typeof mock>).mockReturnValue(true);
+
+      await router.handleIncomingMessage(OWNER_ADDR, 'Hello', 1000);
+
+      const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
+      expect(startCalls.length).toBe(1);
+      const session = startCalls[0][0];
+      expect(session.keepAlive).toBe(true);
+    });
+
     test('returns early when no agent is found for new conversation', async () => {
       const freshDb = new Database(':memory:');
       freshDb.exec('PRAGMA foreign_keys = ON');
@@ -913,6 +924,15 @@ describe('handleLocalMessage', () => {
     const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
     expect(startCalls.length).toBe(1);
     expect(startCalls[0][2]).toBeUndefined();
+  });
+
+  test('creates session with keepAlive: true', async () => {
+    await router.handleLocalMessage(AGENT_ID, 'Hello', sendFn, undefined, eventFn);
+
+    const startCalls = (pm.startProcess as ReturnType<typeof mock>).mock.calls;
+    expect(startCalls.length).toBe(1);
+    const session = startCalls[0][0];
+    expect(session.keepAlive).toBe(true);
   });
 });
 

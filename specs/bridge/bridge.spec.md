@@ -95,7 +95,7 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 
 | Path | Description |
 |------|-------------|
-| `/api/bridge/ws` | Bridge client connection point; requires auth handshake as first message |
+| `/api/bridge` | Bridge client connection point; requires auth handshake as first message. Also accepts `/api/bridge/ws` for backwards compatibility. |
 
 ### MCP Tools (registered when `bridgeService` is available)
 
@@ -124,7 +124,7 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 
 - **Given** a developer connects to `/api/bridge/ws` and sends `{ type: "auth", token: "<api-key>", projectId: "proj-1", capabilities: { read: true, write: false, exec: false }, label: "My MacBook" }`
 - **When** the server validates the token
-- **Then** the server replies `{ type: "auth_ok", sessionId: "<uuid>" }`, registers the session, and the session appears in `GET /api/bridge/sessions`
+- **Then** the server replies `{ type: "auth-ok", sessionId: "<uuid>" }`, registers the session, and the session appears in `GET /api/bridge/sessions`
 
 ### Scenario: Agent reads a remote file
 

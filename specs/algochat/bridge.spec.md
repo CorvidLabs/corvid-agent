@@ -114,6 +114,7 @@ Central orchestrator for the AlgoChat on-chain messaging system. Bridges Algoran
 14. **Session isolation**: AlgoChat-sourced sessions create isolated git worktrees for safe code execution
 15. **Session notification forwarding**: Approval requests, session errors, and session exits from AlgoChat-sourced sessions are forwarded as on-chain messages to the participant
 16. **Dual-network PSK bridge**: When `agentNetwork !== network`, a secondary PSKContactManager and PSKDiscoveryPoller are created on the localnet service. This allows agents communicating on localnet to reach us via PSK even when the primary messaging network is testnet/mainnet. Both managers share the same MessageRouter and ResponseFormatter lookup
+17. **Session keep-alive**: All sessions created by `MessageRouter` (both AlgoChat on-chain and local browser chat) are created with `keepAlive: true`, enabling warm process reuse for multi-turn conversations
 
 ## Behavioral Examples
 
