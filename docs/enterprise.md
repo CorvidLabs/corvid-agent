@@ -11,7 +11,7 @@ Deploying corvid-agent for organizations that need security, compliance, multi-t
 - **RBAC** — owner, operator, and viewer roles per tenant
 - **Audit trail** — every action logged, optionally recorded on-chain (Algorand)
 - **Container sandboxing** — agent code execution in isolated Docker containers
-- **API-first** — 312 REST endpoints, OpenAPI spec, Swagger UI
+- **API-first** — 216 REST endpoints, OpenAPI spec, Swagger UI
 - **Deployment flexibility** — Docker, Kubernetes (Helm + raw manifests), systemd, macOS LaunchAgent
 
 ---
@@ -304,7 +304,7 @@ cosign verify-attestation \
 
 ## API access
 
-- **REST API:** 312 endpoints across 58 route modules
+- **REST API:** 216 endpoints across 58 route modules
 - **OpenAPI spec:** `GET /api/openapi.json`
 - **Swagger UI:** `GET /api/docs`
 - **WebSocket:** Real-time streaming for sessions and events

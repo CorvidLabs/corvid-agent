@@ -1,6 +1,6 @@
 # MCP Setup Guide
 
-CorvidAgent exposes **97 MCP tools** (`corvid_*`) via standard [Model Context Protocol](https://modelcontextprotocol.io) stdio transport. This means it works with any MCP-compatible AI assistant.
+CorvidAgent exposes **64 MCP tools** (`corvid_*`) via standard [Model Context Protocol](https://modelcontextprotocol.io) stdio transport. This means it works with any MCP-compatible AI assistant.
 
 ## Quick Setup
 

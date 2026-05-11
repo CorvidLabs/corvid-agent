@@ -5,7 +5,7 @@
 **corvid-agent** is a decentralized development agent platform built on Algorand. It spawns, orchestrates, and monitors AI agents that perform software engineering work with on-chain identity, encrypted inter-agent communication, and structured multi-agent deliberation.
 
 - **Runtime**: Bun (TypeScript)
-- **Database**: SQLite via bun:sqlite (21 migrations, 120+ tables)
+- **Database**: SQLite via bun:sqlite (21 migrations, 114 tables)
 - **Agent SDK**: @anthropic-ai/claude-agent-sdk (Claude AI)
 - **Blockchain**: Algorand (AlgoChat messaging, wallets)
 - **Frontend**: Angular 21 (dashboard)
