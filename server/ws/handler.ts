@@ -157,7 +157,11 @@ export function createWebSocketHandler(
       const label = typeof msg.label === 'string' ? msg.label.slice(0, MAX_LABEL_LENGTH) : 'unnamed';
       const projectId = typeof msg.projectId === 'string' ? msg.projectId.slice(0, MAX_LABEL_LENGTH) : '';
 
-      const clientCaps = (msg.capabilities as BridgeCapabilities | undefined) ?? { read: true, write: false, exec: false };
+      const clientCaps = (msg.capabilities as BridgeCapabilities | undefined) ?? {
+        read: true,
+        write: false,
+        exec: false,
+      };
       const effectiveCaps = service.intersectCapabilities(clientCaps);
 
       data.authenticated = true;
