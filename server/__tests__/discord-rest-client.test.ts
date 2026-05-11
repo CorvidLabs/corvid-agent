@@ -353,7 +353,8 @@ describe('DiscordRestClient methods', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe('get');
       expect(calls[0].route).toContain('guild-1');
-      expect(calls[0].route).toContain('with_counts=true');
+      const opts = calls[0].options as { query?: URLSearchParams };
+      expect(opts?.query?.get('with_counts')).toBe('true');
     });
 
     test('throws on API error', async () => {
