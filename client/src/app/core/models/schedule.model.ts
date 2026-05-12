@@ -46,6 +46,28 @@ export interface ScheduleAction {
     prompt?: string;
     maxImprovementTasks?: number;
     focusArea?: string;
+    channelId?: string;
+    embedTitle?: string;
+    embedColor?: number;
+}
+
+export type ScheduleExecutionMode = 'independent' | 'pipeline';
+
+export type PipelineStepCondition = 'always' | 'on_success' | 'on_failure';
+
+export interface PipelineStep {
+    label: string;
+    action: ScheduleAction;
+    condition?: PipelineStepCondition;
+}
+
+export type ScheduleOutputDestinationType = 'discord_channel' | 'algochat_agent' | 'algochat_address';
+export type ScheduleOutputFormat = 'summary' | 'full' | 'on_error_only';
+
+export interface ScheduleOutputDestination {
+    type: ScheduleOutputDestinationType;
+    target: string;
+    format?: ScheduleOutputFormat;
 }
 
 export interface AgentSchedule {
@@ -61,7 +83,11 @@ export interface AgentSchedule {
     maxExecutions: number | null;
     executionCount: number;
     maxBudgetPerRun: number | null;
+    notifyAddress: string | null;
     triggerEvents: ScheduleTriggerEvent[] | null;
+    outputDestinations: ScheduleOutputDestination[] | null;
+    executionMode: ScheduleExecutionMode;
+    pipelineSteps: PipelineStep[] | null;
     lastRunAt: string | null;
     nextRunAt: string | null;
     createdAt: string;
@@ -81,6 +107,7 @@ export interface ScheduleExecution {
     sessionId: string | null;
     workTaskId: string | null;
     costUsd: number;
+    configSnapshot?: Record<string, unknown>;
     startedAt: string;
     completedAt: string | null;
 }
@@ -95,10 +122,15 @@ export interface CreateScheduleInput {
     approvalPolicy?: ScheduleApprovalPolicy;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    notifyAddress?: string;
     triggerEvents?: ScheduleTriggerEvent[];
+    outputDestinations?: ScheduleOutputDestination[];
+    executionMode?: ScheduleExecutionMode;
+    pipelineSteps?: PipelineStep[];
 }
 
 export interface UpdateScheduleInput {
+    agentId?: string;
     name?: string;
     description?: string;
     cronExpression?: string;
@@ -108,5 +140,9 @@ export interface UpdateScheduleInput {
     status?: ScheduleStatus;
     maxExecutions?: number;
     maxBudgetPerRun?: number;
+    notifyAddress?: string | null;
     triggerEvents?: ScheduleTriggerEvent[] | null;
+    outputDestinations?: ScheduleOutputDestination[] | null;
+    executionMode?: ScheduleExecutionMode;
+    pipelineSteps?: PipelineStep[] | null;
 }
