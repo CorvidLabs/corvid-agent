@@ -167,7 +167,7 @@ const EXEC_STATUS_LABELS: Record<ScheduleExecutionStatus, string> = {
                                                 </span>
                                             </div>
                                             @if (exec.costUsd > 0) {
-                                                <div class="list__item-cost">${{ exec.costUsd.toFixed(4) }}</div>
+                                                <div class="list__item-cost">{{ '$' + exec.costUsd.toFixed(4) }}</div>
                                             }
                                         </div>
                                         <div class="list__item-meta">
