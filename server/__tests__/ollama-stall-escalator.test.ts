@@ -41,6 +41,7 @@ const mockGetSession = mock((_db: unknown, _id: string) => ({
   workDir: null,
   creditsConsumed: 0,
   keepAlive: false,
+  tokensSaved: 0,
   lastContextTokens: null,
   lastContextWindow: null,
   createdAt: new Date().toISOString(),

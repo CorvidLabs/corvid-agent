@@ -71,6 +71,8 @@ Keep-alive is enabled per-session via `SpawnOptions.keepAlive`. When enabled:
 
 The warm path avoids re-sending: system prompt (~2-4K tokens), conversation history (variable, often 10-50K tokens), observations (~1-2K tokens), and persona/skill prompts (~1-2K tokens). For a typical 20-message conversation, this saves ~80-90% of input tokens per turn.
 
+**Tracking:** Warm turns accumulate `tokens_saved` in the sessions table via `addSessionTokensSaved(db, session.id, session.lastContextTokens)`. `lastContextTokens` from the previous turn is used as the per-warm-turn savings estimate (since it represents what would have been re-sent in a cold-path context reconstruction). This is called in the warm path success block immediately after logging the warm turn.
+
 ## Public API
 
 ### Exported Types
