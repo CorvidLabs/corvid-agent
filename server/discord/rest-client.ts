@@ -272,8 +272,7 @@ export class DiscordRestClient {
     try {
       let result: unknown;
       if (withCounts) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result = await (this.rest.get as any)(`/guilds/${guildId}?with_counts=true`);
+        result = await this.rest.get(Routes.guild(guildId), { query: new URLSearchParams({ with_counts: 'true' }) });
       } else {
         result = await this.rest.get(Routes.guild(guildId));
       }

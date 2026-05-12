@@ -6,7 +6,7 @@
  * REST client (rest-client.ts), which handles rate limiting automatically.
  */
 
-import { MessageFlags, type RepliableInteraction } from 'discord.js';
+import { type APIEmbed, MessageFlags, type RepliableInteraction } from 'discord.js';
 import type { DeliveryTracker } from '../lib/delivery-tracker';
 import { createLogger } from '../lib/logger';
 import { splitMessage } from './message-formatter';
@@ -296,8 +296,10 @@ export async function respondToInteractionEmbed(
   ephemeral = false,
 ): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await interaction.reply({ embeds: [embed as any], ...(ephemeral && { flags: MessageFlags.Ephemeral }) });
+    await interaction.reply({
+      embeds: [embed as unknown as APIEmbed],
+      ...(ephemeral && { flags: MessageFlags.Ephemeral }),
+    });
   } catch (error) {
     log.error('Failed to respond to Discord interaction with embed', {
       error: error instanceof Error ? error.message : String(error),
@@ -311,8 +313,10 @@ export async function respondToInteractionEmbeds(
   ephemeral = false,
 ): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await interaction.reply({ embeds: embeds as any[], ...(ephemeral && { flags: MessageFlags.Ephemeral }) });
+    await interaction.reply({
+      embeds: embeds as unknown[] as APIEmbed[],
+      ...(ephemeral && { flags: MessageFlags.Ephemeral }),
+    });
   } catch (error) {
     log.error('Failed to respond to Discord interaction with embeds', {
       error: error instanceof Error ? error.message : String(error),
@@ -345,8 +349,7 @@ export async function editDeferredResponse(
   try {
     const body: Record<string, unknown> = {};
     if (content) body.content = content.slice(0, MAX_MESSAGE_LENGTH);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (embeds) body.embeds = embeds as any[];
+    if (embeds) body.embeds = embeds as unknown[] as APIEmbed[];
     await interaction.editReply(body);
   } catch (error) {
     log.error('Failed to edit deferred response', {
