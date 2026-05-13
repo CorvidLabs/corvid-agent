@@ -36,18 +36,18 @@ corvid-agent bets that blockchain-backed identity, cryptographic communication, 
 |--------|-------|
 | TypeScript LOC | 182,301 |
 | Server modules | 47 |
-| API routes | 55 modules (~236 endpoints) |
+| API routes | 58 modules (~216 endpoints) |
 | Database tables | 114 |
 | Database migrations | 52 (squashed baseline) |
 | MCP tools | 64 corvid_* handlers |
-| Unit tests | 4,242 test files |
-| E2E tests | 360 across 33 Playwright specs |
-| Security tests | 232 dedicated |
+| Unit tests | 12,000+ test files |
+| E2E tests | 388 across 33 Playwright specs |
+| Security tests | 386 dedicated |
 | Module specs | 221 .spec.md files |
 | Test:code ratio | 1.14x (more test than production) |
 | Dependencies | 17 direct |
-| Version | 0.51.0 |
-| Git commits | 941 |
+| Version | 0.66.0 |
+| Git commits | 1,529 |
 
 ### Tech Stack
 
@@ -67,8 +67,8 @@ algochat/        21 files — On-chain identity, wallets, PSK messaging, agent d
 councils/        3 files  — Multi-agent deliberation, governance tiers, synthesis
 work/            1 file   — Self-improvement pipeline (worktrees, validation, PRs)
 process/         —          Session lifecycle, SDK + Ollama, approval flow, personas
-mcp/             17 files — 56 corvid_* tool handlers
-routes/          55 files — REST API (~236 endpoints)
+mcp/             17 files — 64 corvid_* tool handlers
+routes/          58 files — REST API (~216 endpoints)
 db/              —          SQLite schema, 11 migrations, 93 tables
 reputation/      5 files  — Scoring, attestation, verification, identity proofs
 memory/          8 files  — Vector embeddings, FTS5 search, decay, sync
@@ -89,7 +89,7 @@ scheduler/       —          Cron/interval execution engine
 marketplace/     —          Agent service listings, escrow, federation
 ```
 
-### 38 MCP Tools (What Agents Can Do)
+### 64 MCP Tools (What Agents Can Do)
 
 | Category | Tools |
 |----------|-------|

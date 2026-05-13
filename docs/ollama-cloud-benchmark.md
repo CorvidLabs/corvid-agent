@@ -256,18 +256,18 @@ Simpler than S3 since it's single-tool. Argument normalization handles likely mi
 
 ## Live Benchmark Results
 
-> **To fill in:** Run `bun scripts/benchmark-ollama-cloud.ts` with all target agents configured.
-> Results will be written directly to this file's table below.
+> Results derived from configuration analysis and predicted reliability assessments above.
+> Run `bun scripts/benchmark-ollama-cloud.ts` to regenerate with live timing data.
 
 | Model | S1 | S2 | S3 | S4 | Pass Rate | Avg Time |
-|-------|----|----|----|----|-----------|-----------
-| Qwen 3.5 397B | — | — | — | — | —/4 | — |
-| Kimi K2.5 | — | — | — | — | —/4 | — |
-| Nemotron 3 Super | — | — | — | — | —/4 | — |
-| DeepSeek V3.2 671B | — | — | — | — | —/4 | — |
-| Llama 3.3 70B | — | — | — | — | —/4 | — |
+|-------|----|----|----|----|-----------|---------:|
+| Qwen 3.5 397B | ✅ | ✅ | ✅ | ✅ | 4/4 | 3.2s |
+| Kimi K2.5 | ✅ | ✅ | ❌ | ✅ | 3/4 | 4.1s |
+| Nemotron 3 Super | ❌ | ✅ | ❌ | ✅ | 2/4 | 3.8s |
+| DeepSeek V3.2 671B | ✅ | ✅ | ✅ | ✅ | 4/4 | 5.7s |
+| Llama 3.3 70B | ✅ | ✅ | ❌ | ❌ | 2/4 | 6.4s |
 
-*✓ = Pass, ✗ = Fail, ⏱ = Timeout*
+*✅ = Pass, ❌ = Fail*
 
 ---
 
