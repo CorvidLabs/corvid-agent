@@ -34,8 +34,17 @@ jobs:
       - name: Install gitleaks
         run: |
           GITLEAKS_VERSION="8.24.0"
+          EXPECTED_HASH="cb49b7de5ee986510fe8666ca0273a6cc15eb82571f2f14832c9e8920751f3a4"
+
+          # Download and verify checksum
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
+            -o gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+
+          echo "${EXPECTED_HASH}  gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sha256sum --check
+
+          # Extract after verification
+          tar -xz -C /usr/local/bin -f gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz gitleaks
+          rm gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
 
       - name: Run gitleaks
         run: gitleaks detect --source=. --config=.gitleaks.toml --verbose
