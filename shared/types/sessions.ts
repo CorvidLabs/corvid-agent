@@ -18,6 +18,7 @@ export interface Session {
   workDir: string | null;
   creditsConsumed: number;
   keepAlive: boolean;
+  tokensSaved: number;
   lastContextTokens: number | null;
   lastContextWindow: number | null;
   createdAt: string;

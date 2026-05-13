@@ -32,6 +32,7 @@ interface SessionRow {
   work_dir: string | null;
   credits_consumed: number;
   keep_alive: number;
+  tokens_saved: number;
   last_context_tokens: number | null;
   last_context_window: number | null;
   created_at: string;
@@ -74,6 +75,7 @@ function rowToSession(row: SessionRow): Session {
     workDir: row.work_dir ?? null,
     creditsConsumed: row.credits_consumed ?? 0,
     keepAlive: row.keep_alive === 1,
+    tokensSaved: row.tokens_saved ?? 0,
     lastContextTokens: row.last_context_tokens ?? null,
     lastContextWindow: row.last_context_window ?? null,
     createdAt: row.created_at,
@@ -245,6 +247,10 @@ export function updateSessionContextTokens(db: Database, id: string, tokens: num
   db.query(
     "UPDATE sessions SET last_context_tokens = ?, last_context_window = ?, updated_at = datetime('now') WHERE id = ?",
   ).run(tokens, contextWindow, id);
+}
+
+export function addSessionTokensSaved(db: Database, id: string, tokens: number): void {
+  db.query('UPDATE sessions SET tokens_saved = tokens_saved + ? WHERE id = ?').run(tokens, id);
 }
 
 export function updateSessionAlgoSpent(db: Database, id: string, microAlgos: number): void {
