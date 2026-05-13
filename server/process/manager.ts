@@ -18,6 +18,7 @@ import {
   getSession,
   getSessionMessages,
   incrementSessionCumulativeTurns,
+  incrementSessionWarmTurnCount,
   setDurationCheckpoint,
   updateSessionContextTokens,
   updateSessionCost,
@@ -1025,6 +1026,7 @@ export class ProcessManager {
           if (sent) {
             // Warm path: message delivered to live process — no context reconstruction.
             log.debug(`Session ${session.id}: warm turn — context reconstruction skipped`);
+            incrementSessionWarmTurnCount(this.db, session.id);
             if (proc.isWarm()) {
               this.timerManager.clearKeepAliveTtl(session.id);
             }

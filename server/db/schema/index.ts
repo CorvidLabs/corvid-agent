@@ -313,6 +313,7 @@ const MIGRATIONS: Record<number, string[]> = {
     `ALTER TABLE sessions ADD COLUMN active_duration_ms INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE sessions ADD COLUMN duration_checkpoint INTEGER`,
   ],
+  129: [`ALTER TABLE sessions ADD COLUMN warm_turn_count INTEGER NOT NULL DEFAULT 0`],
 };
 
 // ── Schema version ──────────────────────────────────────────────────

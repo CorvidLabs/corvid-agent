@@ -32,6 +32,7 @@ interface SessionRow {
   work_dir: string | null;
   credits_consumed: number;
   keep_alive: number;
+  warm_turn_count: number;
   last_context_tokens: number | null;
   last_context_window: number | null;
   created_at: string;
@@ -74,6 +75,7 @@ function rowToSession(row: SessionRow): Session {
     workDir: row.work_dir ?? null,
     creditsConsumed: row.credits_consumed ?? 0,
     keepAlive: row.keep_alive === 1,
+    warmTurnCount: row.warm_turn_count ?? 0,
     lastContextTokens: row.last_context_tokens ?? null,
     lastContextWindow: row.last_context_window ?? null,
     createdAt: row.created_at,
@@ -238,6 +240,12 @@ export function getSessionCumulativeTurns(db: Database, id: string): number {
 export function incrementSessionCumulativeTurns(db: Database, id: string): void {
   db.query(
     "UPDATE sessions SET cumulative_turns = COALESCE(cumulative_turns, 0) + 1, updated_at = datetime('now') WHERE id = ?",
+  ).run(id);
+}
+
+export function incrementSessionWarmTurnCount(db: Database, id: string): void {
+  db.query(
+    "UPDATE sessions SET warm_turn_count = COALESCE(warm_turn_count, 0) + 1, updated_at = datetime('now') WHERE id = ?",
   ).run(id);
 }
 

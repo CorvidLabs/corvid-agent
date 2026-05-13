@@ -8,6 +8,7 @@ files:
   - server/db/migrations/125_cumulative_turns.ts
   - server/db/migrations/127_session_keep_alive.ts
   - server/db/migrations/128_session_active_duration.ts
+  - server/db/migrations/129_warm_turn_count.ts
 db_tables:
   - sessions
   - session_messages
@@ -42,6 +43,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | `updateSessionTurns` | `(db: Database, id: string, turns: number)` | `void` | Update turn count independently of cost (for immediate persistence on user message) |
 | `getSessionCumulativeTurns` | `(db: Database, id: string)` | `number` | Read `cumulative_turns` for a session (returns 0 if not found). Unlike `total_turns`, this never resets on context compaction |
 | `incrementSessionCumulativeTurns` | `(db: Database, id: string)` | `void` | Atomically increment `cumulative_turns` by 1 using COALESCE for NULL safety |
+| `incrementSessionWarmTurnCount` | `(db: Database, id: string)` | `void` | Atomically increment `warm_turn_count` by 1; called on every successful warm-path delivery |
 | `updateSessionAlgoSpent` | `(db: Database, id: string, microAlgos: number)` | `void` | Increment total ALGO spent (additive, not replacement) |
 | `updateSessionContextTokens` | `(db: Database, id: string, tokens: number, contextWindow: number)` | `void` | Persist real context token count and window size from API |
 | `setDurationCheckpoint` | `(db: Database, id: string, timestampMs: number)` | `void` | Set duration checkpoint (epoch ms) for active-time accumulation |
@@ -92,6 +94,13 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 |----------|-----------|---------|-------------|
 | `up` | `(db: Database)` | `void` | Adds `active_duration_ms` (INTEGER NOT NULL DEFAULT 0) and `duration_checkpoint` (INTEGER, nullable) columns to sessions table (guarded by PRAGMA table_info) |
 | `down` | `(_db: Database)` | `void` | No-op (SQLite does not support DROP COLUMN in older versions) |
+
+### Exported Migration Functions — `server/db/migrations/129_warm_turn_count.ts`
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `up` | `(db: Database)` | `void` | Adds `warm_turn_count` (INTEGER NOT NULL DEFAULT 0) column to sessions table (guarded by PRAGMA table_info) |
+| `down` | `(db: Database)` | `void` | No-op (column addition is additive-only) |
 
 ## Invariants
 
@@ -153,7 +162,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 
 | Module | What is used |
 |--------|-------------|
-| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `incrementSessionCumulativeTurns`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession`, `setDurationCheckpoint`, `accumulateActiveDuration`, `finalizeActiveDuration` |
+| `server/process/manager.ts` | `getSession`, `getSessionMessages`, `updateSessionPid`, `updateSessionStatus`, `updateSessionCost`, `updateSessionTurns`, `incrementSessionCumulativeTurns`, `incrementSessionWarmTurnCount`, `updateSessionContextTokens`, `updateSessionAgent`, `addSessionMessage`, `createSession`, `getParticipantForSession`, `setDurationCheckpoint`, `accumulateActiveDuration`, `finalizeActiveDuration` |
 | `server/work/service.ts` | `createSession` |
 | `server/scheduler/service.ts` | `createSession` |
 | `server/routes/sessions.ts` | All session CRUD functions |
@@ -179,6 +188,7 @@ No business logic lives here -- just SQL queries with row-to-domain mapping.
 | total_turns | INTEGER | DEFAULT 0 | Number of conversation turns (resets on context compaction) |
 | cumulative_turns | INTEGER | DEFAULT 0 | Total turns across all context windows (never resets) |
 | keep_alive | INTEGER | NOT NULL, DEFAULT 0 | Per-session keep-alive flag (boolean: 0=off, 1=on) |
+| warm_turn_count | INTEGER | NOT NULL, DEFAULT 0 | Count of warm-path turns delivered without context reconstruction |
 | active_duration_ms | INTEGER | NOT NULL, DEFAULT 0 | Cumulative active processing time in milliseconds |
 | duration_checkpoint | INTEGER | nullable | Epoch timestamp (ms) when active duration tracking started |
 | council_launch_id | TEXT | nullable | Links to council_launches if part of a council |
@@ -226,3 +236,4 @@ No environment variables. This module is a pure data layer.
 | 2026-05-01 | corvid-agent | Add cumulative_turns column, getSessionCumulativeTurns, incrementSessionCumulativeTurns (#2216) |
 | 2026-05-04 | corvid-agent | Add keep_alive column for per-session keep-alive flag (Phase 3) |
 | 2026-05-04 | corvid-agent | Add active_duration_ms and duration_checkpoint columns, migration 128 (#2247) |
+| 2026-05-10 | corvid-agent | Add warm_turn_count column and incrementSessionWarmTurnCount, migration 129 |
