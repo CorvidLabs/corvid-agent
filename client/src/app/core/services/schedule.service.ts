@@ -17,7 +17,6 @@ export class ScheduleService {
 
     readonly schedules = signal<AgentSchedule[]>([]);
     readonly executions = signal<ScheduleExecution[]>([]);
-    readonly pendingApprovals = signal<ScheduleExecution[]>([]);
     readonly loading = signal(false);
 
     private unsubscribeWs: (() => void) | null = null;
@@ -27,41 +26,27 @@ export class ScheduleService {
 
         this.unsubscribeWs = this.ws.onMessage((msg: ServerWsMessage) => {
             if (msg.type === 'schedule_update') {
-                const schedule = msg.schedule as AgentSchedule;
                 this.schedules.update((list) => {
-                    const idx = list.findIndex((s) => s.id === schedule.id);
+                    const idx = list.findIndex((s) => s.id === msg.schedule.id);
                     if (idx >= 0) {
                         const copy = [...list];
-                        copy[idx] = schedule;
+                        copy[idx] = msg.schedule;
                         return copy;
                     }
-                    return [schedule, ...list];
+                    return [msg.schedule, ...list];
                 });
             }
 
             if (msg.type === 'schedule_execution_update') {
-                const execution = msg.execution as ScheduleExecution;
                 this.executions.update((list) => {
-                    const idx = list.findIndex((e) => e.id === execution.id);
+                    const idx = list.findIndex((e) => e.id === msg.execution.id);
                     if (idx >= 0) {
                         const copy = [...list];
-                        copy[idx] = execution;
+                        copy[idx] = msg.execution;
                         return copy;
                     }
-                    return [execution, ...list];
+                    return [msg.execution, ...list];
                 });
-
-                // Track pending approvals
-                if (execution.status === 'awaiting_approval') {
-                    this.pendingApprovals.update((list) => {
-                        if (list.some((e) => e.id === execution.id)) return list;
-                        return [execution, ...list];
-                    });
-                } else {
-                    this.pendingApprovals.update((list) =>
-                        list.filter((e) => e.id !== execution.id),
-                    );
-                }
             }
         });
     }
@@ -134,7 +119,6 @@ export class ScheduleService {
         const execution = await firstValueFrom(
             this.api.post<ScheduleExecution>(`/schedule-executions/${executionId}/resolve`, { approved }),
         );
-        this.pendingApprovals.update((list) => list.filter((e) => e.id !== executionId));
         return execution;
     }
 

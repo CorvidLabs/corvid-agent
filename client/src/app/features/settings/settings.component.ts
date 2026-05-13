@@ -20,8 +20,9 @@ import { DatabaseSettingsComponent } from './database-settings.component';
 import { SettingsSecurityComponent } from '../settings-security/settings-security.component';
 import { SettingsAccessComponent } from '../settings-access/settings-access.component';
 import { SettingsIntegrationsComponent } from '../settings-integrations/settings-integrations.component';
+import { SettingsAutomationComponent } from '../settings-automation/settings-automation.component';
 
-type SettingsTab = 'general' | 'channels' | 'ai' | 'notifications' | 'security' | 'access' | 'integrations';
+type SettingsTab = 'general' | 'channels' | 'ai' | 'notifications' | 'security' | 'access' | 'integrations' | 'automation';
 
 interface OperationalMode {
     mode: string;
@@ -47,6 +48,7 @@ interface OperationalMode {
         SettingsSecurityComponent,
         SettingsAccessComponent,
         SettingsIntegrationsComponent,
+        SettingsAutomationComponent,
         MatButtonToggleModule,
     ],
     template: `
@@ -91,6 +93,9 @@ interface OperationalMode {
                         }
                         @case ('integrations') {
                             <app-settings-integrations />
+                        }
+                        @case ('automation') {
+                            <app-settings-automation />
                         }
                     }
                 }
@@ -138,6 +143,7 @@ export class SettingsComponent implements OnInit {
         { id: 'security', label: 'Security' },
         { id: 'access', label: 'Access' },
         { id: 'integrations', label: 'Integrations' },
+        { id: 'automation', label: 'Automation' },
     ];
 
     readonly activeTab = signal<SettingsTab>('general');
