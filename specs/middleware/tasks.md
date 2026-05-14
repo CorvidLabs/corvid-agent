@@ -5,7 +5,7 @@ spec: auth.spec.md
 ## Active Tasks
 
 - [ ] Secure remote access: implement mutual TLS or token-scoped API keys for non-localhost deployments (#1549)
-- [ ] v1.0.0-rc payment gating: add credit balance middleware guard for session creation on paid deployments (#1689)
+- [x] v1.0.0-rc payment gating: add credit balance middleware guard for session creation on paid deployments (#1689)
 - [ ] Add 2FA (TOTP) support for admin endpoints — currently auth is single-factor API key only (#430 adjacent)
 - [ ] Expose API key rotation status and expiry in the Security settings panel
 
