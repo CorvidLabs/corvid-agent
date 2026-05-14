@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { getAgent } from '../db/agents';
 import { recordAudit } from '../db/audit';
+import { getBalance } from '../db/credits';
 import { getSessionMetrics } from '../db/session-metrics';
 import {
   addSessionMessage,
@@ -22,6 +23,7 @@ import {
   UpdateSessionSchema,
   ValidationError,
 } from '../lib/validation';
+import type { AuthConfig } from '../middleware/auth';
 import type { RequestContext } from '../middleware/guards';
 import { tenantRoleGuard } from '../middleware/guards';
 import { getClientIp } from '../middleware/rate-limit';
@@ -37,6 +39,7 @@ export async function handleSessionRoutes(
   processManager: ProcessManager,
   context?: RequestContext,
   workTaskService?: WorkTaskService | null,
+  authConfig?: AuthConfig | null,
 ): Promise<Response | null> {
   const path = url.pathname;
   const method = req.method;
@@ -53,7 +56,7 @@ export async function handleSessionRoutes(
       const denied = tenantRoleGuard('operator', 'owner')(req, url, context);
       if (denied) return denied;
     }
-    return handleCreate(req, db, processManager, tenantId);
+    return handleCreate(req, db, processManager, tenantId, context?.walletAddress, authConfig);
   }
 
   const match = path.match(/^\/api\/sessions\/([^/]+)(\/(.+))?$/);
@@ -137,8 +140,21 @@ async function handleCreate(
   db: Database,
   processManager: ProcessManager,
   tenantId: string = 'default',
+  walletAddress?: string,
+  authConfig?: AuthConfig | null,
 ): Promise<Response> {
   try {
+    if (walletAddress && authConfig) {
+      const isLocalhost =
+        authConfig.bindHost === '127.0.0.1' || authConfig.bindHost === 'localhost' || authConfig.bindHost === '::1';
+      if (!isLocalhost) {
+        const balance = getBalance(db, walletAddress);
+        if (balance.available <= 0) {
+          return json({ error: 'Insufficient credits', available: balance.available }, 402);
+        }
+      }
+    }
+
     const data = await parseBodyOrThrow(req, CreateSessionSchema);
     if (data.initialPrompt) {
       const injectionDenied = checkInjection(db, data.initialPrompt, 'session_create', req);

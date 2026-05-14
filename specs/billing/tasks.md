@@ -4,7 +4,7 @@ spec: billing.spec.md
 
 ## Active Tasks
 
-- [ ] v1.0.0-rc security and payment gating: enforce credit balance checks before session start on non-localhost deployments (#1689)
+- [x] v1.0.0-rc security and payment gating: enforce credit balance checks before session start on non-localhost deployments (#1689)
 - [ ] Add billing dashboard view: current-period usage breakdown, credit balance, and cost projection (#1623)
 - [ ] USDC deposit confirmation flow: notify operators via AlgoChat when a USDC transfer is detected and converted to credits
 - [ ] Add Stripe webhook replay protection integration test covering the 300-second window
