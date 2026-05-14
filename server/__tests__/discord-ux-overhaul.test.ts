@@ -22,6 +22,35 @@ import type { ThreadCallbackInfo } from '../discord/thread-session-map';
 import { DeliveryTracker } from '../lib/delivery-tracker';
 import type { ProcessManager } from '../process/manager';
 
+// ─── Discord call types ───────────────────────────────────────────────────────
+
+interface DiscordEmbed {
+  description?: string;
+  color?: number;
+  title?: string;
+  footer?: { text?: string };
+  fields?: Array<{ name: string; value: string }>;
+}
+
+interface DiscordButton {
+  label?: string;
+  custom_id?: string;
+}
+
+interface DiscordCallData {
+  embeds?: DiscordEmbed[];
+  components?: Array<{ components?: DiscordButton[] }>;
+  content?: string;
+  [key: string]: unknown;
+}
+
+type DiscordCall = {
+  method: 'respond' | 'editDeferred' | 'send' | 'edit' | 'sendFiles';
+  data: DiscordCallData;
+};
+
+// ─── Test helpers ─────────────────────────────────────────────────────────────
+
 // Valid Discord snowflake IDs for testing
 const THREAD_ID = '400000000000000001';
 const MSG_ID = '500000000000000001';
@@ -50,32 +79,32 @@ function createMockProcessManager() {
 
 /** Install a mock rest client that returns valid snowflake IDs */
 function installSnowflakeMock(): {
-  calls: unknown[];
+  calls: DiscordCall[];
   cleanup: () => void;
-  waitForCall: (predicate: (c: any) => boolean, timeoutMs?: number) => Promise<unknown>;
+  waitForCall: (predicate: (c: DiscordCall) => boolean, timeoutMs?: number) => Promise<DiscordCall>;
 } {
-  const calls: unknown[] = [];
-  const listeners: Array<(entry: unknown) => void> = [];
-  const pushCall = (entry: unknown) => {
+  const calls: DiscordCall[] = [];
+  const listeners: Array<(entry: DiscordCall) => void> = [];
+  const pushCall = (entry: DiscordCall) => {
     calls.push(entry);
     for (const fn of listeners) fn(entry);
   };
   const mockClient: Partial<DiscordRestClient> = {
     respondToInteraction: async (_id, _token, data) => {
-      pushCall({ method: 'respond', data });
+      pushCall({ method: 'respond', data: data as DiscordCallData });
       return {} as never;
     },
     deferInteraction: async () => {},
     editDeferredResponse: async (_appId, _token, data) => {
-      pushCall({ method: 'editDeferred', data });
+      pushCall({ method: 'editDeferred', data: data as DiscordCallData });
       return {} as never;
     },
     sendMessage: async (_channelId, data) => {
-      pushCall({ method: 'send', data });
+      pushCall({ method: 'send', data: data as DiscordCallData });
       return { id: MSG_ID } as never;
     },
     editMessage: async (_channelId, _messageId, data) => {
-      pushCall({ method: 'edit', data });
+      pushCall({ method: 'edit', data: data as DiscordCallData });
       return { id: MSG_ID } as never;
     },
     deleteMessage: async () => {},
@@ -83,14 +112,14 @@ function installSnowflakeMock(): {
     removeReaction: async () => {},
     sendTypingIndicator: async () => {},
     sendMessageWithFiles: async (_channelId, data) => {
-      pushCall({ method: 'sendFiles', data });
+      pushCall({ method: 'sendFiles', data: data as DiscordCallData });
       return { id: MSG_ID } as never;
     },
   };
   _setRestClientForTesting(mockClient as DiscordRestClient);
 
   /** Wait for a call matching the predicate (checks existing calls first, then listens for new ones). */
-  const waitForCall = (predicate: (c: any) => boolean, timeoutMs = 10_000): Promise<unknown> => {
+  const waitForCall = (predicate: (c: DiscordCall) => boolean, timeoutMs = 10_000): Promise<DiscordCall> => {
     const existing = calls.find(predicate);
     if (existing) return Promise.resolve(existing);
     return new Promise((resolve, reject) => {
@@ -99,7 +128,7 @@ function installSnowflakeMock(): {
         if (idx >= 0) listeners.splice(idx, 1);
         reject(new Error(`waitForCall timed out after ${timeoutMs}ms`));
       }, timeoutMs);
-      const handler = (entry: unknown) => {
+      const handler = (entry: DiscordCall) => {
         if (predicate(entry)) {
           clearTimeout(timer);
           const idx = listeners.indexOf(handler);
@@ -160,7 +189,7 @@ describe('embed-response streaming edits', () => {
       callback('session-1', { type: 'tool_status', statusMessage: 'Running tests...' });
       await new Promise((r) => setTimeout(r, 100));
 
-      const sendCalls = calls.filter((c: any) => c.method === 'send');
+      const sendCalls = calls.filter((c: DiscordCall) => c.method === 'send');
       expect(sendCalls.length).toBeGreaterThanOrEqual(1);
 
       // Wait for debounce (3s)
@@ -170,7 +199,7 @@ describe('embed-response streaming edits', () => {
       callback('session-1', { type: 'tool_status', statusMessage: 'Compiling...' });
       await new Promise((r) => setTimeout(r, 100));
 
-      const editCalls = calls.filter((c: any) => c.method === 'edit');
+      const editCalls = calls.filter((c: DiscordCall) => c.method === 'edit');
       expect(editCalls.length).toBeGreaterThanOrEqual(1);
     } finally {
       const cb = pendingSubscribers[0]?.callback;
@@ -187,27 +216,27 @@ describe('embed-response streaming edits', () => {
 
     // Use a promise-based approach instead of polling to avoid CI timing flakiness.
     // The mock sendMessage resolves a promise when a call with button components arrives.
-    let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => {
+    let resolveButtons: (call: DiscordCall) => void;
+    const buttonsPromise = new Promise<DiscordCall>((resolve) => {
       resolveButtons = resolve;
     });
 
-    const calls: unknown[] = [];
+    const calls: DiscordCall[] = [];
     const mockClient: Partial<DiscordRestClient> = {
       respondToInteraction: async (_id, _token, data) => {
-        calls.push({ method: 'respond', data });
+        calls.push({ method: 'respond', data: data as DiscordCallData });
         return {} as never;
       },
       deferInteraction: async () => {},
       editDeferredResponse: async (_appId, _token, data) => {
-        calls.push({ method: 'editDeferred', data });
+        calls.push({ method: 'editDeferred', data: data as DiscordCallData });
         return {} as never;
       },
       sendMessage: async (_channelId, data) => {
-        const entry = { method: 'send', data };
+        const entry: DiscordCall = { method: 'send', data: data as DiscordCallData };
         calls.push(entry);
         // Resolve the promise when we see buttons
-        if ((data as any)?.components?.[0]?.components?.length > 0) {
+        if ((entry.data.components?.[0]?.components?.length ?? 0) > 0) {
           resolveButtons(entry);
         }
         return { id: MSG_ID } as never;
@@ -257,8 +286,8 @@ describe('embed-response streaming edits', () => {
 
       expect(embedWithButtons).toBeDefined();
       if (embedWithButtons) {
-        const actionRow = (embedWithButtons as any).data.components[0];
-        const buttonLabels = actionRow.components.map((b: any) => b.label);
+        const actionRow = embedWithButtons.data.components?.[0];
+        const buttonLabels = actionRow?.components?.map((b) => b.label) ?? [];
         expect(buttonLabels).toContain('New Session');
         expect(buttonLabels).toContain('Create Issue');
         expect(buttonLabels).toContain('Archive');
@@ -300,7 +329,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Should have an edit with ✅ Done
-      const doneEdit = calls.find((c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description === '✅ Done');
+      const doneEdit = calls.find((c: DiscordCall) => c.method === 'edit' && c.data?.embeds?.[0]?.description === '✅ Done');
       expect(doneEdit).toBeDefined();
     } finally {
       cleanup();
@@ -388,7 +417,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Should send a warning embed with yellow color
-      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
+      const warningEmbed = calls.find((c: DiscordCall) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
       expect(warningEmbed).toBeDefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx')?.callback;
@@ -470,7 +499,7 @@ describe('embed-response streaming edits', () => {
 
       // Wait for crash edit event-driven (typing interval fires at 8s, then async chain completes)
       const crashEdit = await waitForCall(
-        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.description?.includes('ended unexpectedly'),
+        (c: DiscordCall) => c.method === 'edit' && (c.data?.embeds?.[0]?.description?.includes('ended unexpectedly') ?? false),
         12000,
       );
       expect(crashEdit).toBeDefined();
@@ -504,26 +533,26 @@ describe('embed-response streaming edits', () => {
     const delivery = new DeliveryTracker();
     const threadCallbacks = new Map<string, ThreadCallbackInfo>();
 
-    let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => {
+    let resolveButtons: (call: DiscordCall) => void;
+    const buttonsPromise = new Promise<DiscordCall>((resolve) => {
       resolveButtons = resolve;
     });
 
-    const calls: unknown[] = [];
+    const calls: DiscordCall[] = [];
     const mockClient: Partial<DiscordRestClient> = {
       respondToInteraction: async () => ({}) as never,
       deferInteraction: async () => {},
       editDeferredResponse: async () => ({}) as never,
       sendMessage: async (_channelId, data) => {
-        const entry = { method: 'send', data };
+        const entry: DiscordCall = { method: 'send', data: data as DiscordCallData };
         calls.push(entry);
-        if ((data as any)?.components?.[0]?.components?.length > 0) {
+        if ((entry.data.components?.[0]?.components?.length ?? 0) > 0) {
           resolveButtons(entry);
         }
         return { id: MSG_ID } as never;
       },
       editMessage: async (_channelId, _messageId, data) => {
-        calls.push({ method: 'edit', data });
+        calls.push({ method: 'edit', data: data as DiscordCallData });
         return { id: MSG_ID } as never;
       },
       deleteMessage: async () => {},
@@ -531,7 +560,7 @@ describe('embed-response streaming edits', () => {
       removeReaction: async () => {},
       sendTypingIndicator: async () => {},
       sendMessageWithFiles: async (_channelId, data) => {
-        calls.push({ method: 'sendFiles', data });
+        calls.push({ method: 'sendFiles', data: data as DiscordCallData });
         return { id: MSG_ID } as never;
       },
     };
@@ -564,9 +593,9 @@ describe('embed-response streaming edits', () => {
 
       expect(embedWithButtons).toBeDefined();
       if (embedWithButtons) {
-        const embed = (embedWithButtons as any).data.embeds[0];
+        const embed = embedWithButtons.data.embeds?.[0];
         // Should have stats fields
-        const fieldNames = (embed.fields || []).map((f: any) => f.name);
+        const fieldNames = (embed?.fields ?? []).map((f) => f.name);
         expect(fieldNames).toContain('Duration');
         expect(fieldNames).toContain('Turns');
         expect(fieldNames).toContain('Tool Calls');
@@ -602,7 +631,7 @@ describe('embed-response streaming edits', () => {
 
       // Should have sent an ack embed
       const ackEmbed = calls.find(
-        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.description?.includes('working on it'),
+        (c: DiscordCall) => c.method === 'send' && (c.data?.embeds?.[0]?.description?.includes('working on it') ?? false),
       );
       expect(ackEmbed).toBeDefined();
     } finally {
@@ -647,7 +676,7 @@ describe('embed-response streaming edits', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Should have an edit for the error
-      const errorEdit = calls.find((c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.color !== undefined);
+      const errorEdit = calls.find((c: DiscordCall) => c.method === 'edit' && c.data?.embeds?.[0]?.color !== undefined);
       expect(errorEdit).toBeDefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-5')?.callback;
@@ -663,32 +692,32 @@ describe('adaptive-response Continue in Thread button', () => {
     const pm = createMockProcessManager();
     const delivery = new DeliveryTracker();
 
-    let resolveButtons: (call: unknown) => void;
-    const buttonsPromise = new Promise<unknown>((resolve) => {
+    let resolveButtons: (call: DiscordCall) => void;
+    const buttonsPromise = new Promise<DiscordCall>((resolve) => {
       resolveButtons = resolve;
     });
 
-    const calls: unknown[] = [];
+    const calls: DiscordCall[] = [];
     const mockClient: Partial<DiscordRestClient> = {
       respondToInteraction: async (_id, _token, data) => {
-        calls.push({ method: 'respond', data });
+        calls.push({ method: 'respond', data: data as DiscordCallData });
         return {} as never;
       },
       deferInteraction: async () => {},
       editDeferredResponse: async (_appId, _token, data) => {
-        calls.push({ method: 'editDeferred', data });
+        calls.push({ method: 'editDeferred', data: data as DiscordCallData });
         return {} as never;
       },
       sendMessage: async (_channelId, data) => {
-        const entry = { method: 'send', data };
+        const entry: DiscordCall = { method: 'send', data: data as DiscordCallData };
         calls.push(entry);
-        if ((data as any)?.components?.[0]?.components?.some((b: any) => b.custom_id?.startsWith('continue_thread'))) {
+        if (entry.data.components?.[0]?.components?.some((b) => b.custom_id?.startsWith('continue_thread'))) {
           resolveButtons(entry);
         }
         return { id: MSG_ID } as never;
       },
       editMessage: async (_channelId, _messageId, data) => {
-        calls.push({ method: 'edit', data });
+        calls.push({ method: 'edit', data: data as DiscordCallData });
         return {} as never;
       },
       deleteMessage: async () => {},
@@ -696,7 +725,7 @@ describe('adaptive-response Continue in Thread button', () => {
       removeReaction: async () => {},
       sendTypingIndicator: async () => {},
       sendMessageWithFiles: async (_channelId, data) => {
-        calls.push({ method: 'sendFiles', data });
+        calls.push({ method: 'sendFiles', data: data as DiscordCallData });
         return { id: MSG_ID } as never;
       },
     };
@@ -729,8 +758,8 @@ describe('adaptive-response Continue in Thread button', () => {
 
       expect(embedWithButtons).toBeDefined();
       if (embedWithButtons) {
-        const actionRow = (embedWithButtons as any).data.components[0];
-        const buttonIds = actionRow.components.map((b: any) => b.custom_id);
+        const actionRow = embedWithButtons.data.components?.[0];
+        const buttonIds = actionRow?.components?.map((b) => b.custom_id) ?? [];
         expect(buttonIds[0]).toMatch(/^continue_thread:/);
       }
     } finally {
@@ -769,7 +798,7 @@ describe('adaptive-response Continue in Thread button', () => {
 
       // Should send a new embed (not edit)
       const errorEmbed = calls.find(
-        (c: any) => c.method === 'send' && c.data?.embeds?.[0]?.title === 'Credits Exhausted',
+        (c: DiscordCall) => c.method === 'send' && c.data?.embeds?.[0]?.title === 'Credits Exhausted',
       );
       expect(errorEmbed).toBeDefined();
     } finally {
@@ -928,7 +957,7 @@ describe('progress-response real-time context usage', () => {
       );
 
       // Wait for the initial progress embed to be sent
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-1')!.callback;
 
       // Wait past debounce so context_usage update isn't throttled
@@ -945,7 +974,7 @@ describe('progress-response real-time context usage', () => {
 
       // Should have edited the progress embed with usage in the footer
       const editWithUsage = calls.find(
-        (c: any) => c.method === 'edit' && c.data?.embeds?.[0]?.footer?.text?.includes('25%'),
+        (c: DiscordCall) => c.method === 'edit' && (c.data?.embeds?.[0]?.footer?.text?.includes('25%') ?? false),
       );
       expect(editWithUsage).toBeDefined();
     } finally {
@@ -973,7 +1002,7 @@ describe('progress-response real-time context usage', () => {
         'test-model',
       );
 
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-2')!.callback;
 
       // Send a tool_status to set the description
@@ -993,10 +1022,10 @@ describe('progress-response real-time context usage', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Find the edit triggered by context_usage (after the tool_status edit)
-      const edits = calls.filter((c: any) => c.method === 'edit');
-      const lastEdit = edits[edits.length - 1] as any;
-      expect(lastEdit.data.embeds[0].description).toContain('Reading file...');
-      expect(lastEdit.data.embeds[0].footer.text).toContain('45%');
+      const edits = calls.filter((c: DiscordCall) => c.method === 'edit');
+      const lastEdit = edits[edits.length - 1];
+      expect(lastEdit?.data.embeds?.[0]?.description).toContain('Reading file...');
+      expect(lastEdit?.data.embeds?.[0]?.footer?.text).toContain('45%');
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-2')?.callback;
       if (cb) cb('session-ctx-2', { type: 'result', result: '' });
@@ -1022,14 +1051,14 @@ describe('progress-response real-time context usage', () => {
         'test-model',
       );
 
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-3')!.callback;
 
       // Wait past initial debounce
       await new Promise((r) => setTimeout(r, 3200));
 
       // Record baseline edit count before sending rapid events
-      const editsBefore = calls.filter((c: any) => c.method === 'edit').length;
+      const editsBefore = calls.filter((c: DiscordCall) => c.method === 'edit').length;
 
       // Rapidly send multiple context_usage events
       for (let i = 0; i < 5; i++) {
@@ -1043,7 +1072,7 @@ describe('progress-response real-time context usage', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Only 1 new edit should have been made (debounced), not 5
-      const editsAfterSend = calls.filter((c: any) => c.method === 'edit').length;
+      const editsAfterSend = calls.filter((c: DiscordCall) => c.method === 'edit').length;
       expect(editsAfterSend - editsBefore).toBe(1);
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-3')?.callback;
@@ -1070,7 +1099,7 @@ describe('progress-response real-time context usage', () => {
         'test-model',
       );
 
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-4')!.callback;
 
       callback('session-ctx-4', {
@@ -1081,7 +1110,7 @@ describe('progress-response real-time context usage', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // Should send a new warning embed with yellow color
-      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
+      const warningEmbed = calls.find((c: DiscordCall) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
       expect(warningEmbed).toBeDefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-4')?.callback;
@@ -1108,7 +1137,7 @@ describe('progress-response real-time context usage', () => {
         'test-model',
       );
 
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-5')!.callback;
 
       callback('session-ctx-5', {
@@ -1119,7 +1148,7 @@ describe('progress-response real-time context usage', () => {
       await new Promise((r) => setTimeout(r, 200));
 
       // No warning embed should be sent (only critical level triggers it)
-      const warningEmbed = calls.find((c: any) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
+      const warningEmbed = calls.find((c: DiscordCall) => c.method === 'send' && c.data?.embeds?.[0]?.color === 0xf0b232);
       expect(warningEmbed).toBeUndefined();
     } finally {
       const cb = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-5')?.callback;
@@ -1146,7 +1175,7 @@ describe('progress-response real-time context usage', () => {
         'test-model',
       );
 
-      await waitForCall((c: any) => c.method === 'send');
+      await waitForCall((c: DiscordCall) => c.method === 'send');
       // Let the .then() callback set progressMessageId
       await new Promise((r) => setTimeout(r, 50));
       const callback = pendingSubscribers.find((s) => s.sessionId === 'session-ctx-6')!.callback;
@@ -1165,10 +1194,10 @@ describe('progress-response real-time context usage', () => {
 
       // The "Done" edit should include context usage
       const doneEdit = calls.find(
-        (c: any) =>
+        (c: DiscordCall) =>
           c.method === 'edit' &&
           c.data?.embeds?.[0]?.description === '✅ Done' &&
-          c.data?.embeds?.[0]?.footer?.text?.includes('75%'),
+          (c.data?.embeds?.[0]?.footer?.text?.includes('75%') ?? false),
       );
       expect(doneEdit).toBeDefined();
     } finally {
