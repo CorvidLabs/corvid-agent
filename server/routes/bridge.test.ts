@@ -74,4 +74,28 @@ describe('bridge routes', () => {
     expect(body.capabilities.write).toBe(true);
     expect(body.capabilities.exec).toBe(false);
   });
+
+  test('DELETE /api/bridge/sessions/:id returns 404 for unknown', async () => {
+    const req = new Request('http://localhost/api/bridge/sessions/nonexistent', { method: 'DELETE' });
+    const url = new URL(req.url);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, service);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(404);
+    const body = await res!.json();
+    expect(body.error).toBe('Session not found');
+  });
+
+  test('DELETE /api/bridge/sessions/:id removes session and returns 204', async () => {
+    const svc = new BridgeService();
+    const mockWs = { send: () => {}, close: () => {} } as any;
+    svc.registerSession('del1', 'test-laptop', 'proj-1', { read: true, write: false, exec: false }, mockWs);
+    expect(svc.getSession('del1')).not.toBeNull();
+
+    const req = new Request('http://localhost/api/bridge/sessions/del1', { method: 'DELETE' });
+    const url = new URL(req.url);
+    const res = await handleDevBridgeRoutes(req, url, null as any, context, svc);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(204);
+    expect(svc.getSession('del1')).toBeUndefined();
+  });
 });
