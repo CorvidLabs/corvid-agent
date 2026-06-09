@@ -90,6 +90,7 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 |--------|------|-------------|
 | `GET` | `/api/bridge/sessions` | List all active bridge sessions |
 | `GET` | `/api/bridge/sessions/:id` | Get a single session by ID (404 if not found) |
+| `DELETE` | `/api/bridge/sessions/:id` | Evict a bridge session by ID. Returns 204 on success, 404 if not found. Closes the WebSocket and rejects all pending requests. |
 
 ### WebSocket Endpoint
 
@@ -150,6 +151,17 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 - **When** the reap interval fires (every 60 s)
 - **Then** the session WebSocket is closed with code 4003 ("Idle timeout") and the session is removed
 
+### Scenario: DELETE /api/bridge/sessions/:id — session exists
+
+- **Given** an authenticated session with ID `abc123`
+- **When** `DELETE /api/bridge/sessions/abc123` is called
+- **Then** the session is removed, WS is closed, and response is 204 No Content
+
+### Scenario: DELETE /api/bridge/sessions/:id — session not found
+
+- **When** `DELETE /api/bridge/sessions/unknown` is called
+- **Then** response is 404 `{ error: "Session not found" }`
+
 ## Error Cases
 
 | Condition | Behavior |
@@ -204,4 +216,5 @@ The bridge is intended for the `fledge-plugin-bridge` Kotlin plugin but can be u
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-05-12 | Jackdaw | Added DELETE /api/bridge/sessions/:id for manual session eviction |
 | 2026-05-06 | Jackdaw | Initial spec — documents bridge module added in PR #2287 |

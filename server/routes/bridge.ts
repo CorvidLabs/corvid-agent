@@ -32,6 +32,14 @@ export async function handleDevBridgeRoutes(
     });
   }
 
+  if (sessionMatch && req.method === 'DELETE') {
+    const sessionId = sessionMatch[1];
+    const session = bridgeService.getSession(sessionId);
+    if (!session) return json({ error: 'Session not found' }, 404);
+    bridgeService.removeSession(sessionId);
+    return new Response(null, { status: 204 });
+  }
+
   const requestMatch = url.pathname.match(/^\/api\/bridge\/sessions\/([^/]+)\/request$/);
   if (requestMatch && req.method === 'POST') {
     const sessionId = requestMatch[1];
