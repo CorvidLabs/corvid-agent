@@ -1,7 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
+import { grantCredits } from '../db/credits';
 import { runMigrations } from '../db/schema';
 import { insertSessionMetrics } from '../db/session-metrics';
+import type { AuthConfig } from '../middleware/auth';
 import type { ProcessManager } from '../process/manager';
 import { handleSessionRoutes } from '../routes/sessions';
 import type { WorkTaskService } from '../work/service';
@@ -601,6 +603,64 @@ describe('Session Routes', () => {
       expect(res!.status).toBe(201);
       const data = await res!.json();
       expect(data.complexityWarning).toBeUndefined();
+    });
+  });
+
+  describe('POST /api/sessions — payment gating', () => {
+    // Valid Algorand address format: 58 uppercase base32 chars [A-Z2-7]
+    const WALLET_EMPTY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    const WALLET_FUNDED = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+    const WALLET_NO_CHECK = 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
+
+    const remoteConfig: AuthConfig = { apiKey: 'test-key', allowedOrigins: [], bindHost: '0.0.0.0' };
+    const localhostConfig: AuthConfig = { apiKey: null, allowedOrigins: [], bindHost: '127.0.0.1' };
+
+    it('returns 402 when wallet has zero credits on a non-localhost deployment', async () => {
+      const pm = createMockPM();
+      const context = { walletAddress: WALLET_EMPTY, tenantId: 'default', authenticated: false };
+      const { req, url } = fakeReq('POST', '/api/sessions', { projectId, name: 'Gated' });
+      const res = await handleSessionRoutes(req, url, db, pm, context, null, remoteConfig);
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(402);
+      const data = await res!.json();
+      expect(data.error).toBe('Insufficient credits');
+      expect(data.available).toBe(0);
+    });
+
+    it('allows session creation on localhost even with zero credits', async () => {
+      const pm = createMockPM();
+      const context = { walletAddress: WALLET_EMPTY, tenantId: 'default', authenticated: false };
+      const { req, url } = fakeReq('POST', '/api/sessions', { projectId, name: 'Local' });
+      const res = await handleSessionRoutes(req, url, db, pm, context, null, localhostConfig);
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(201);
+    });
+
+    it('allows session creation when no wallet address is in context', async () => {
+      const pm = createMockPM();
+      const { req, url } = fakeReq('POST', '/api/sessions', { projectId, name: 'No Wallet' });
+      const res = await handleSessionRoutes(req, url, db, pm, undefined, null, remoteConfig);
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(201);
+    });
+
+    it('allows session creation when wallet has positive credits on non-localhost', async () => {
+      grantCredits(db, WALLET_FUNDED, 50, 'test-grant');
+      const pm = createMockPM();
+      const context = { walletAddress: WALLET_FUNDED, tenantId: 'default', authenticated: false };
+      const { req, url } = fakeReq('POST', '/api/sessions', { projectId, name: 'Funded' });
+      const res = await handleSessionRoutes(req, url, db, pm, context, null, remoteConfig);
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(201);
+    });
+
+    it('skips credit check when authConfig is not provided', async () => {
+      const pm = createMockPM();
+      const context = { walletAddress: WALLET_NO_CHECK, tenantId: 'default', authenticated: false };
+      const { req, url } = fakeReq('POST', '/api/sessions', { projectId, name: 'No Config' });
+      const res = await handleSessionRoutes(req, url, db, pm, context, null, null);
+      expect(res).not.toBeNull();
+      expect(res!.status).toBe(201);
     });
   });
 });
