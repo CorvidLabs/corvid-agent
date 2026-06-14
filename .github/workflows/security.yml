@@ -17,6 +17,10 @@ on:
     - cron: "0 7 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
