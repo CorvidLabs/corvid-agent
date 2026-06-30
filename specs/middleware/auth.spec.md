@@ -52,6 +52,7 @@ HTTP and WebSocket authentication, CORS handling, and startup security validatio
 7. **CORS origin reflection with Vary**: When `allowedOrigins` is configured, the request origin is reflected if it matches the allowlist; `Vary: Origin` is set when the reflected origin is not `*`
 8. **Disallowed origin**: When `allowedOrigins` is set and the request origin is not in the list, `Access-Control-Allow-Origin` is set to empty string (browser blocks the response)
 9. **CORS secure default on public deployments**: When `allowedOrigins` is empty and `bindHost` is not localhost, cross-origin requests (those with an `Origin` header) receive `Access-Control-Allow-Origin: ''` (browser blocks). Non-browser requests (no `Origin` header) receive `Access-Control-Allow-Origin: *`.
+10. **Payment gate on session creation**: When `AuthConfig` is passed to `handleSessionRoutes` and `bindHost` is non-localhost, any session creation request carrying a wallet address in the request context is checked for a positive available credit balance. Requests with `available <= 0` are rejected with HTTP 402. Localhost deployments and requests without a wallet address are never gated.
 
 ## Behavioral Examples
 
